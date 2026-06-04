@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Inductive Reasoning Test</title>
+<title>Inductive Reasoning Game</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500&display=swap" rel="stylesheet">
@@ -106,6 +106,26 @@
     background: var(--accent);
     color: white;
     border-color: var(--accent);
+  }
+  .diff-row button.locked {
+    opacity: 0.45;
+    cursor: not-allowed;
+    position: relative;
+  }
+  .diff-row button.locked:hover::after {
+    content: attr(data-soon);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    background: var(--text);
+    color: var(--bg);
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    pointer-events: none;
+    z-index: 10;
   }
   .diff-label {
     color: var(--muted);
@@ -616,7 +636,7 @@
     <!-- ============ LOGIN ============ -->
     <div class="screen login active" id="screen-login">
       <div class="login-card">
-        <h1>Inductive Reasoning Test</h1>
+        <h1>Inductive Reasoning Game</h1>
         <p class="subtitle">Sign in to save your stats and compete on the leaderboard — or jump in as a guest.</p>
         <button class="btn-google" id="btn-login-google"></button>
         <button class="back-link" id="btn-skip-login">Skip for now — play as a guest</button>
@@ -625,14 +645,14 @@
 
     <!-- ============ MAIN MENU ============ -->
     <div class="screen menu" id="screen-menu">
-      <h1>Inductive Reasoning Test</h1>
+      <h1>Inductive Reasoning Game</h1>
       <div class="subtitle">A 5-problem round measures your average solve time.</div>
 
       <div class="diff-label">Difficulty</div>
       <div class="diff-row" id="diff-row">
-        <button data-diff="medium">Medium</button>
-        <button data-diff="hard" class="active">Hard</button>
-        <button data-diff="expert">Expert</button>
+        <button data-diff="medium" class="active">Medium</button>
+        <button data-diff="hard" class="locked" data-soon="Coming soon">Hard</button>
+        <button data-diff="expert" class="locked" data-soon="Coming soon">Expert</button>
       </div>
 
       <div class="menu-actions">
@@ -1148,7 +1168,7 @@ function generateProblem(difficulty) {
 const ROUND_LENGTH = 5;
 const HISTORY_KEY = 'irt-history-v1';
 
-let difficulty = 'hard';
+let difficulty = 'medium';
 let round = null; // { problems: [{ time, correct }], current: null, currentIdx, startTime, timerInterval, answered }
 
 const screens = {
@@ -1501,6 +1521,7 @@ function renderHistory() {
 
 document.querySelectorAll('#diff-row button').forEach(btn => {
   btn.addEventListener('click', () => {
+    if (btn.classList.contains('locked')) return;
     difficulty = btn.dataset.diff;
     document.querySelectorAll('#diff-row button').forEach(b => b.classList.toggle('active', b === btn));
   });
