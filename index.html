@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <title>Inductive Reasoning Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #ffffff;
@@ -19,9 +22,14 @@
     --border: #d1d5db;
   }
   * { box-sizing: border-box; }
+  /* Force Fredoka everywhere; UA-styled controls (button/input) don't inherit by default. */
+  html, body, button, input, select, textarea, .container * {
+    font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-weight: 400;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
@@ -34,6 +42,11 @@
   .screen { display: none; }
   .screen.active { display: block; }
 
+  /* Light 300 for secondary / label text */
+  .subtitle, .label, .diff-label, .big-label,
+  .result-stat .lbl, .stat span, .history-row.head,
+  .account-bar .signin-text, .account-info .who .sub { font-weight: 300; }
+
   /* ----- Menu ----- */
   .menu {
     text-align: center;
@@ -42,7 +55,7 @@
   .menu h1 {
     font-size: 36px;
     margin: 0 0 12px 0;
-    font-weight: 700;
+    font-weight: 500;
   }
   .menu .subtitle {
     color: var(--muted);
@@ -59,7 +72,7 @@
   .menu-actions button {
     padding: 14px 22px;
     font-size: 16px;
-    font-weight: 600;
+    font-weight: 500;
     border-radius: 10px;
     cursor: pointer;
     border: 1px solid var(--border);
@@ -111,7 +124,7 @@
     gap: 12px;
     flex-wrap: wrap;
   }
-  h1.round-title { font-size: 22px; margin: 0; font-weight: 600; }
+  h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
   .stats { display: flex; gap: 10px; font-variant-numeric: tabular-nums; flex-wrap: wrap; }
   .stat {
     background: var(--panel-light);
@@ -197,7 +210,7 @@
     box-shadow: 0 6px 16px rgba(91,180,80,0.25);
   }
   .option .letter {
-    font-weight: 700;
+    font-weight: 500;
     color: var(--muted);
     font-size: 16px;
   }
@@ -221,7 +234,7 @@
     padding: 10px 22px;
     border-radius: 8px;
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
   }
   button.next:hover { background: var(--accent-hover); }
@@ -241,7 +254,7 @@
   .results h2 { font-size: 28px; margin: 0 0 8px 0; }
   .results .big {
     font-size: 72px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--accent);
     font-variant-numeric: tabular-nums;
     margin: 24px 0 8px 0;
@@ -268,7 +281,7 @@
   }
   .result-stat .val {
     font-size: 22px;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
   .result-stat .lbl {
@@ -301,7 +314,7 @@
   }
   .per-problem th {
     color: var(--muted);
-    font-weight: 600;
+    font-weight: 500;
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -312,7 +325,7 @@
     padding: 2px 8px;
     border-radius: 999px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
   }
   .badge.correct { background: rgba(91,180,80,0.15); color: var(--accent); }
   .badge.wrong   { background: #f3f4f6; color: var(--muted); }
@@ -350,9 +363,9 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 1px;
-    font-weight: 600;
+    font-weight: 500;
   }
-  .history-row .avg { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent); }
+  .history-row .avg { font-variant-numeric: tabular-nums; font-weight: 500; color: var(--accent); }
   .history-row .num { font-variant-numeric: tabular-nums; }
   .history-empty {
     padding: 40px;
@@ -388,6 +401,188 @@
   }
   .danger:hover { color: #b91c1c; border-color: #b91c1c; }
 
+  /* ----- Login ----- */
+  .login {
+    display: none;
+    min-height: 60vh;
+  }
+  .login.active { display: flex; align-items: center; justify-content: center; }
+  .login-card {
+    text-align: center;
+    padding: 40px 28px;
+    max-width: 420px;
+    width: 100%;
+  }
+  .login-card h1 { font-size: 32px; margin: 0 0 12px 0; font-weight: 500; }
+  .login-card .subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 32px;
+    line-height: 1.5;
+  }
+  #btn-login-google, #btn-skip-login {
+    width: 280px;
+    padding: 12px 20px;
+  }
+  #btn-login-google { margin-bottom: 28px; }
+  #btn-skip-login {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  #btn-skip-login:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ----- Account / Auth ----- */
+  .account-bar {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: max-content;
+    gap: 10px;
+    padding: 14px;
+    background: var(--panel-light);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .account-bar .signin-text {
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+  .account-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--border);
+  }
+  .account-info .who { text-align: left; line-height: 1.25; }
+  .account-info .who .name { font-weight: 500; font-size: 14px; }
+  .account-info .who .sub { color: var(--muted); font-size: 12px; }
+  .btn-small {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn-small:hover { color: var(--text); border-color: var(--accent); }
+  .account-bar .btn-small { align-self: stretch; }
+  .btn-small.primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .btn-small.primary:hover { background: var(--accent-hover); }
+  .menu-actions button .lock {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+    margin-left: 6px;
+  }
+
+  /* ----- Modal ----- */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(17,19,24,0.45);
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 100;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+  }
+  .modal-box h3 { margin: 0 0 10px 0; font-size: 20px; }
+  .modal-box p { color: var(--muted); font-size: 14px; margin: 0 0 22px 0; }
+  .modal-box .avatar { width: 56px; height: 56px; margin: 0 auto 14px auto; }
+  .modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .modal-actions button {
+    padding: 12px 18px;
+    font-size: 15px;
+    font-weight: 500;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--panel-light);
+    color: var(--text);
+  }
+  .modal-actions button.primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .modal-actions button.primary:hover { background: var(--accent-hover); }
+  #modal-gsi { display: flex; justify-content: center; margin-bottom: 16px; }
+
+  /* ----- Leaderboard ----- */
+  .leaderboard h2 { font-size: 24px; margin: 0 0 8px 0; }
+  #leaderboard-content { margin: 20px 0; }
+  .leaderboard .history-row {
+    grid-template-columns: 44px 1fr 110px 90px 120px;
+  }
+  .leaderboard .history-row .rank {
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .leaderboard .history-row.me {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  .leaderboard .history-row .you {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent);
+    margin-left: 6px;
+  }
+
+  /* ----- Google sign-in button ----- */
+  .btn-google {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 18px;
+    background: #fff;
+    color: #1f1f1f;
+    border: 1px solid #dadce0;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn-google:hover { background: #f7f8f8; border-color: #c6c9cc; }
+  .btn-google svg { display: block; }
+
   svg { display: block; }
   @media (max-width: 720px) {
     .options { grid-template-columns: repeat(3, 1fr); }
@@ -395,16 +590,43 @@
     .option .tile { width: 88px; height: 88px; }
     .history-row { grid-template-columns: 1fr 80px 80px; }
     .history-row .col-problems { display: none; }
+    .leaderboard .history-row { grid-template-columns: 30px 1fr 64px 92px; }
+    .account-bar {
+      top: 12px;
+      right: 12px;
+      padding: 12px;
+      gap: 8px;
+    }
   }
+  /* Mid widths: the centered content would slide under the corner widget,
+     so reserve a right gutter for it. Wide screens have natural room. */
+  @media (min-width: 721px) and (max-width: 1520px) {
+    body { padding-right: 274px; }
+  }
+  /* Login has no corner widget, so drop the reserved gutter to stay centered. */
+  body.login-active { padding-right: 24px; }
 </style>
 </head>
 <body>
+  <!-- Account widget: fixed top-right, visible on every screen -->
+  <div class="account-bar" id="account-bar"></div>
+
   <div class="container">
 
+    <!-- ============ LOGIN ============ -->
+    <div class="screen login active" id="screen-login">
+      <div class="login-card">
+        <h1>Inductive Reasoning Test</h1>
+        <p class="subtitle">Sign in to save your stats and compete on the leaderboard — or jump in as a guest.</p>
+        <button class="btn-google" id="btn-login-google"></button>
+        <button class="back-link" id="btn-skip-login">Skip for now — play as a guest</button>
+      </div>
+    </div>
+
     <!-- ============ MAIN MENU ============ -->
-    <div class="screen menu active" id="screen-menu">
+    <div class="screen menu" id="screen-menu">
       <h1>Inductive Reasoning Test</h1>
-      <div class="subtitle">A 10-problem round measures your average solve time.</div>
+      <div class="subtitle">A 5-problem round measures your average solve time.</div>
 
       <div class="diff-label">Difficulty</div>
       <div class="diff-row" id="diff-row">
@@ -416,6 +638,7 @@
       <div class="menu-actions">
         <button class="primary" id="btn-start">Start New Round</button>
         <button id="btn-history">View Previous Attempts</button>
+        <button id="btn-leaderboard">Leaderboard</button>
       </div>
     </div>
 
@@ -424,7 +647,7 @@
       <div class="header">
         <h1 class="round-title">Round in Progress</h1>
         <div class="stats">
-          <div class="stat"><span>Correct</span><b id="score">0</b>/10</div>
+          <div class="stat"><span>Correct</span><b id="score">0</b>/5</div>
           <div class="stat"><span>Attempts</span><b id="problemNum">1</b></div>
           <div class="stat"><span>Time</span><b id="timer">0.0s</b></div>
           <button class="quit" id="btn-quit">Quit</button>
@@ -486,8 +709,24 @@
       </div>
     </div>
 
+    <!-- ============ LEADERBOARD ============ -->
+    <div class="screen" id="screen-leaderboard">
+      <div class="leaderboard">
+        <h2>Leaderboard</h2>
+        <div class="subtitle">Fastest average solve times across all players. Lower is better.</div>
+        <div id="leaderboard-content"></div>
+        <button class="back-link" id="btn-leaderboard-back">← Main Menu</button>
+      </div>
+    </div>
+
   </div>
 
+  <!-- ============ MODAL ============ -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box" id="modal-box"></div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* =========================================================
    Panel model & rendering (unchanged from prior version)
@@ -906,22 +1145,138 @@ function generateProblem(difficulty) {
    App state & screens
    ========================================================= */
 
-const ROUND_LENGTH = 10;
+const ROUND_LENGTH = 5;
 const HISTORY_KEY = 'irt-history-v1';
 
 let difficulty = 'hard';
 let round = null; // { problems: [{ time, correct }], current: null, currentIdx, startTime, timerInterval, answered }
 
 const screens = {
-  menu:    document.getElementById('screen-menu'),
-  round:   document.getElementById('screen-round'),
-  results: document.getElementById('screen-results'),
-  history: document.getElementById('screen-history'),
+  login:       document.getElementById('screen-login'),
+  menu:        document.getElementById('screen-menu'),
+  round:       document.getElementById('screen-round'),
+  results:     document.getElementById('screen-results'),
+  history:     document.getElementById('screen-history'),
+  leaderboard: document.getElementById('screen-leaderboard'),
 };
 
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
+  // The login screen is its own gate — hide the corner account widget there.
+  document.getElementById('account-bar').style.display = (name === 'login') ? 'none' : '';
+  document.body.classList.toggle('login-active', name === 'login');
+}
+
+/* =========================================================
+   Authentication (Supabase + Google OAuth)
+   ---------------------------------------------------------
+   Sign-in is a full-page OAuth redirect handled by Supabase.
+   currentUser.id is the stable Supabase user id (used for
+   leaderboard rows); currentUser.sub keeps the Google `sub`
+   so pre-existing localStorage history still matches.
+   ========================================================= */
+
+const SUPABASE_URL = 'https://lfbsratbyfgjufjpqfvi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmYnNyYXRieWZnanVmanBxZnZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODgwMTcsImV4cCI6MjA5NjE2NDAxN30.oM5o7WXKt_1wQEEDpzfdqqk5U6Ocis50VKwqkQ0PbuI';
+const WELCOMED_KEY = 'irt-welcomed-v1';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null; // { id, sub, name, email, picture }
+
+function userFromSession(session) {
+  if (!session || !session.user) return null;
+  const u = session.user;
+  const m = u.user_metadata || {};
+  return {
+    id: u.id,
+    sub: m.sub || m.provider_id || u.id,
+    name: m.full_name || m.name || m.email || u.email || 'Player',
+    email: m.email || u.email || '',
+    picture: m.avatar_url || m.picture || '',
+  };
+}
+
+// Signed in with Supabase == has an account (a real auth.users row exists).
+function hasAccount() { return !!currentUser; }
+
+async function signInWithGoogle() {
+  await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin + window.location.pathname },
+  });
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  currentUser = null;
+  renderAccountBar();
+  showScreen('login');
+}
+
+function maybeWelcome() {
+  if (!currentUser) return;
+  let seen;
+  try { seen = JSON.parse(localStorage.getItem(WELCOMED_KEY)) || []; }
+  catch { seen = []; }
+  if (seen.includes(currentUser.id)) return;
+  seen.push(currentUser.id);
+  localStorage.setItem(WELCOMED_KEY, JSON.stringify(seen));
+  openModal(`
+    ${currentUser.picture ? `<img class="avatar" src="${currentUser.picture}" alt="" referrerpolicy="no-referrer">` : ''}
+    <h3>Welcome, ${currentUser.name}!</h3>
+    <p>Your rounds are now saved to your account, and your times appear on the global leaderboard.</p>
+    <div class="modal-actions"><button class="primary" id="modal-ok">Let's go</button></div>`);
+  document.getElementById('modal-ok').addEventListener('click', closeModal);
+}
+
+const GOOGLE_BTN = `
+  <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;
+
+function renderAccountBar() {
+  const bar = document.getElementById('account-bar');
+  if (!bar) return;
+
+  if (!currentUser) {
+    bar.innerHTML = `
+      <div class="signin-text">Sign in to save your stats &amp; compete.</div>
+      <button class="btn-google" id="btn-acct-google">${GOOGLE_BTN}<span>Sign in with Google</span></button>`;
+    document.getElementById('btn-acct-google').addEventListener('click', signInWithGoogle);
+  } else {
+    bar.innerHTML = `
+      <div class="account-info">
+        ${currentUser.picture ? `<img class="avatar" src="${currentUser.picture}" alt="" referrerpolicy="no-referrer">` : ''}
+        <div class="who"><div class="name">${currentUser.name}</div><div class="sub">Account active</div></div>
+      </div>
+      <button class="btn-small" id="btn-signout">Sign out</button>`;
+    document.getElementById('btn-signout').addEventListener('click', signOut);
+  }
+}
+
+/* ---------- Modal ---------- */
+
+function openModal(html) {
+  document.getElementById('modal-box').innerHTML = html;
+  document.getElementById('modal-overlay').classList.add('active');
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('active');
+}
+
+// Returns true if signed in; otherwise prompts to sign in and returns false.
+function requireAccount(featureName) {
+  if (currentUser) return true;
+  openModal(`
+    <h3>Sign in required</h3>
+    <p>Sign in with Google to access ${featureName}.</p>
+    <div class="modal-actions">
+      <button class="btn-google" id="modal-signin">${GOOGLE_BTN}<span>Sign in with Google</span></button>
+      <button id="modal-close">Close</button>
+    </div>`);
+  document.getElementById('modal-signin').addEventListener('click', signInWithGoogle);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  return false;
 }
 
 /* ---------- History storage ---------- */
@@ -934,10 +1289,17 @@ function loadHistory() {
 function saveHistoryEntry(entry) {
   const h = loadHistory();
   h.unshift(entry);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 100)));
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 200)));
+}
+// History for the signed-in account only (entries are keyed by Google `sub`).
+function loadAccountHistory() {
+  if (!currentUser) return [];
+  return loadHistory().filter(e => e.sub === currentUser.sub);
 }
 function clearHistory() {
-  localStorage.removeItem(HISTORY_KEY);
+  if (!currentUser) return;
+  const remaining = loadHistory().filter(e => e.sub !== currentUser.sub);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(remaining));
 }
 
 /* ---------- Round / problem flow ---------- */
@@ -1059,6 +1421,7 @@ function finishRound() {
   const correctCount = round.problems.filter(p => p.correct).length;
 
   const entry = {
+    sub: currentUser ? currentUser.sub : null,
     date: new Date().toISOString(),
     difficulty: round.difficulty,
     avg,
@@ -1068,6 +1431,18 @@ function finishRound() {
     problems: round.problems,
   };
   saveHistoryEntry(entry);
+
+  // Signed-in players also post the round to the global leaderboard.
+  if (currentUser) {
+    sb.from('scores').insert({
+      user_id: currentUser.id,
+      display_name: currentUser.name,
+      difficulty: round.difficulty,
+      avg_solve_ms: Math.round(avg * 1000),
+      accuracy: correctCount / round.problems.length,
+    }).then(({ error }) => { if (error) console.error('Leaderboard insert failed:', error.message); });
+  }
+
   renderResults(entry);
   showScreen('results');
 }
@@ -1089,7 +1464,7 @@ function renderResults(entry) {
 /* ---------- History screen ---------- */
 
 function renderHistory() {
-  const h = loadHistory();
+  const h = loadAccountHistory();
   const container = document.getElementById('history-content');
   if (!h.length) {
     container.innerHTML = `<div class="history-empty">No previous attempts yet. Play a round to see your results here.</div>`;
@@ -1102,7 +1477,7 @@ function renderHistory() {
     return `
       <div class="history-row">
         <div>
-          <div style="font-weight:600;">${dateStr}</div>
+          <div style="font-weight:500;">${dateStr}</div>
           <div style="color:var(--muted); font-size:12px; margin-top:2px;">${diff}</div>
         </div>
         <div class="num col-problems">${e.correct}/${e.total} correct</div>
@@ -1131,8 +1506,62 @@ document.querySelectorAll('#diff-row button').forEach(btn => {
   });
 });
 
+function openHistory() {
+  if (!requireAccount('your game history')) return;
+  renderHistory();
+  showScreen('history');
+}
+async function openLeaderboard() {
+  if (!requireAccount('the leaderboard')) return;
+  showScreen('leaderboard');
+  const container = document.getElementById('leaderboard-content');
+  container.innerHTML = `<div class="history-empty">Loading…</div>`;
+  const { data, error } = await sb
+    .from('scores')
+    .select('user_id, display_name, difficulty, avg_solve_ms, accuracy')
+    .order('avg_solve_ms', { ascending: true })
+    .limit(50);
+  renderLeaderboard(container, data, error);
+}
+
+function renderLeaderboard(container, rows, error) {
+  if (error) {
+    container.innerHTML = `<div class="history-empty">Couldn't load the leaderboard. ${error.message}</div>`;
+    return;
+  }
+  if (!rows || !rows.length) {
+    container.innerHTML = `<div class="history-empty">No scores yet — play a round to be the first on the board.</div>`;
+    return;
+  }
+  const body = rows.map((r, i) => {
+    const diff = r.difficulty.charAt(0).toUpperCase() + r.difficulty.slice(1);
+    const mine = currentUser && r.user_id === currentUser.id;
+    return `
+      <div class="history-row${mine ? ' me' : ''}">
+        <div class="rank">${i + 1}</div>
+        <div class="who-name">${r.display_name}${mine ? ' <span class="you">you</span>' : ''}</div>
+        <div class="num col-problems">${diff}</div>
+        <div class="num">${Math.round(r.accuracy * 100)}%</div>
+        <div class="avg">${(r.avg_solve_ms / 1000).toFixed(2)}s avg</div>
+      </div>`;
+  }).join('');
+  container.innerHTML = `
+    <div class="history-list">
+      <div class="history-row head">
+        <div class="rank">#</div>
+        <div>Player</div>
+        <div class="col-problems">Difficulty</div>
+        <div>Accuracy</div>
+        <div>Avg Time</div>
+      </div>
+      ${body}
+    </div>`;
+}
+
 document.getElementById('btn-start').addEventListener('click', startRound);
-document.getElementById('btn-history').addEventListener('click', () => { renderHistory(); showScreen('history'); });
+document.getElementById('btn-history').addEventListener('click', openHistory);
+document.getElementById('btn-leaderboard').addEventListener('click', openLeaderboard);
+document.getElementById('btn-leaderboard-back').addEventListener('click', () => showScreen('menu'));
 document.getElementById('btn-quit').addEventListener('click', () => {
   if (round && round.timerInterval) clearInterval(round.timerInterval);
   showScreen('menu');
@@ -1141,7 +1570,7 @@ document.getElementById('btn-quit').addEventListener('click', () => {
 ui.next.addEventListener('click', nextOrFinish);
 
 document.getElementById('btn-again').addEventListener('click', startRound);
-document.getElementById('btn-results-history').addEventListener('click', () => { renderHistory(); showScreen('history'); });
+document.getElementById('btn-results-history').addEventListener('click', openHistory);
 document.getElementById('btn-results-menu').addEventListener('click', () => showScreen('menu'));
 
 document.getElementById('btn-history-back').addEventListener('click', () => showScreen('menu'));
@@ -1163,6 +1592,36 @@ document.addEventListener('keydown', e => {
     if (el) handleAnswer(idx, el);
   }
 });
+
+// Close the modal when clicking the dimmed backdrop.
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target.id === 'modal-overlay') closeModal();
+});
+
+// Login screen buttons.
+const loginBtn = document.getElementById('btn-login-google');
+loginBtn.innerHTML = `${GOOGLE_BTN}<span>Sign in with Google</span>`;
+loginBtn.addEventListener('click', signInWithGoogle);
+document.getElementById('btn-skip-login').addEventListener('click', () => showScreen('menu'));
+
+/* ---------- Boot ---------- */
+renderAccountBar();
+
+sb.auth.onAuthStateChange((event, session) => {
+  currentUser = userFromSession(session);
+  renderAccountBar();
+  if (event === 'SIGNED_IN') {
+    if (screens.login.classList.contains('active')) showScreen('menu');
+    maybeWelcome();
+  }
+});
+
+(async () => {
+  const { data } = await sb.auth.getSession();
+  currentUser = userFromSession(data.session);
+  renderAccountBar();
+  showScreen(currentUser ? 'menu' : 'login');
+})();
 </script>
 </body>
 </html>
