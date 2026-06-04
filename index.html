@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Inductive Reasoning Test</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #ffffff;
+    --panel-light: #f4f5f7;
+    --tile: #ffffff;
+    --ink: #111;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #5bb450;
+    --accent-hover: #4ea344;
+    --correct: #5bb450;
+    --wrong: #9ca3af;
+    --border: #d1d5db;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .container { width: 100%; max-width: 980px; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ----- Menu ----- */
+  .menu {
+    text-align: center;
+    padding: 40px 20px;
+  }
+  .menu h1 {
+    font-size: 36px;
+    margin: 0 0 12px 0;
+    font-weight: 700;
+  }
+  .menu .subtitle {
+    color: var(--muted);
+    font-size: 16px;
+    margin-bottom: 40px;
+  }
+  .menu-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 360px;
+    margin: 0 auto 40px auto;
+  }
+  .menu-actions button {
+    padding: 14px 22px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--panel-light);
+    color: var(--text);
+    transition: all 0.15s;
+  }
+  .menu-actions button.primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .menu-actions button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .menu-actions button:hover { border-color: var(--accent); }
+  .diff-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .diff-row button {
+    background: var(--panel-light);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .diff-row button.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .diff-label {
+    color: var(--muted);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+
+  /* ----- Round / Test ----- */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  h1.round-title { font-size: 22px; margin: 0; font-weight: 600; }
+  .stats { display: flex; gap: 10px; font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+  .stat {
+    background: var(--panel-light);
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .stat span { color: var(--muted); margin-right: 6px; }
+  .progress-bar {
+    height: 6px;
+    background: var(--panel-light);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    border: 1px solid var(--border);
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+  }
+  .label {
+    color: var(--muted);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  .sequence {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+  .tile {
+    width: 120px;
+    height: 120px;
+    background: var(--tile);
+    border: 2px solid #000;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .tile.question {
+    background: var(--panel-light);
+    border-style: dashed;
+    border-color: var(--muted);
+    color: var(--muted);
+    font-size: 48px;
+    font-weight: 300;
+  }
+  .arrow { color: var(--muted); font-size: 18px; user-select: none; }
+  .options {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+  .option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .option .tile {
+    transition: all 0.15s;
+    width: 110px;
+    height: 110px;
+  }
+  .option:hover:not(.disabled) .tile {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(91,180,80,0.25);
+  }
+  .option .letter {
+    font-weight: 700;
+    color: var(--muted);
+    font-size: 16px;
+  }
+  .option.correct .tile { border-color: var(--correct); box-shadow: 0 0 0 3px var(--correct); }
+  .option.wrong   .tile { border-color: var(--wrong);   box-shadow: 0 0 0 3px var(--wrong); }
+  .option.disabled { cursor: default; }
+  .feedback {
+    margin-top: 24px;
+    min-height: 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .msg { font-size: 15px; }
+  .msg.correct { color: var(--correct); }
+  .msg.wrong   { color: var(--wrong); }
+  button.next, button.quit {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.next:hover { background: var(--accent-hover); }
+  button.next[hidden] { display: none; }
+  button.quit {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  button.quit:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ----- Results ----- */
+  .results {
+    text-align: center;
+    padding: 20px;
+  }
+  .results h2 { font-size: 28px; margin: 0 0 8px 0; }
+  .results .big {
+    font-size: 72px;
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    margin: 24px 0 8px 0;
+  }
+  .results .big-label {
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 13px;
+    margin-bottom: 32px;
+  }
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    max-width: 540px;
+    margin: 0 auto 32px auto;
+  }
+  .result-stat {
+    background: var(--panel-light);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .result-stat .val {
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .result-stat .lbl {
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+  .results-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .per-problem {
+    max-width: 700px;
+    margin: 0 auto 32px auto;
+    text-align: left;
+  }
+  .per-problem table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  .per-problem th, .per-problem td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  .per-problem th {
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .per-problem td.right { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge.correct { background: rgba(91,180,80,0.15); color: var(--accent); }
+  .badge.wrong   { background: #f3f4f6; color: var(--muted); }
+
+  /* ----- History ----- */
+  .history {
+    padding: 8px 0;
+  }
+  .history h2 {
+    font-size: 24px;
+    margin: 0 0 4px 0;
+  }
+  .history .subtitle {
+    color: var(--muted);
+    margin-bottom: 24px;
+    font-size: 14px;
+  }
+  .history-list {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .history-row {
+    display: grid;
+    grid-template-columns: 1fr 100px 100px 100px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    font-size: 14px;
+  }
+  .history-row:last-child { border-bottom: none; }
+  .history-row.head {
+    background: var(--panel-light);
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+  .history-row .avg { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent); }
+  .history-row .num { font-variant-numeric: tabular-nums; }
+  .history-empty {
+    padding: 40px;
+    text-align: center;
+    color: var(--muted);
+    background: var(--panel-light);
+    border-radius: 10px;
+  }
+  .history-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+    gap: 8px;
+  }
+  .back-link {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .back-link:hover { color: var(--text); border-color: var(--accent); }
+  .danger {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .danger:hover { color: #b91c1c; border-color: #b91c1c; }
+
+  svg { display: block; }
+  @media (max-width: 720px) {
+    .options { grid-template-columns: repeat(3, 1fr); }
+    .tile { width: 90px; height: 90px; }
+    .option .tile { width: 88px; height: 88px; }
+    .history-row { grid-template-columns: 1fr 80px 80px; }
+    .history-row .col-problems { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ============ MAIN MENU ============ -->
+    <div class="screen menu active" id="screen-menu">
+      <h1>Inductive Reasoning Test</h1>
+      <div class="subtitle">A 10-problem round measures your average solve time.</div>
+
+      <div class="diff-label">Difficulty</div>
+      <div class="diff-row" id="diff-row">
+        <button data-diff="medium">Medium</button>
+        <button data-diff="hard" class="active">Hard</button>
+        <button data-diff="expert">Expert</button>
+      </div>
+
+      <div class="menu-actions">
+        <button class="primary" id="btn-start">Start New Round</button>
+        <button id="btn-history">View Previous Attempts</button>
+      </div>
+    </div>
+
+    <!-- ============ ROUND ============ -->
+    <div class="screen" id="screen-round">
+      <div class="header">
+        <h1 class="round-title">Round in Progress</h1>
+        <div class="stats">
+          <div class="stat"><span>Correct</span><b id="score">0</b>/10</div>
+          <div class="stat"><span>Attempts</span><b id="problemNum">1</b></div>
+          <div class="stat"><span>Time</span><b id="timer">0.0s</b></div>
+          <button class="quit" id="btn-quit">Quit</button>
+        </div>
+      </div>
+
+      <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+      <div class="panel">
+        <div class="label">Evaluate the sequence. Which figure comes NEXT?</div>
+        <div class="sequence" id="sequence"></div>
+
+        <div class="label">Choose an answer</div>
+        <div class="options" id="options"></div>
+
+        <div class="feedback">
+          <div class="msg" id="msg"></div>
+          <button class="next" id="next" hidden>Next →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ RESULTS ============ -->
+    <div class="screen" id="screen-results">
+      <div class="results">
+        <h2>Round Complete</h2>
+        <div class="big" id="result-avg">0.0s</div>
+        <div class="big-label">Average Solve Time</div>
+
+        <div class="results-grid">
+          <div class="result-stat"><div class="val" id="result-correct">0/0</div><div class="lbl">Correct / Attempts</div></div>
+          <div class="result-stat"><div class="val" id="result-total">0.0s</div><div class="lbl">Total Time</div></div>
+          <div class="result-stat"><div class="val" id="result-diff">Hard</div><div class="lbl">Difficulty</div></div>
+        </div>
+
+        <div class="per-problem">
+          <table>
+            <thead><tr><th>#</th><th>Result</th><th class="right">Time</th></tr></thead>
+            <tbody id="result-rows"></tbody>
+          </table>
+        </div>
+
+        <div class="results-actions">
+          <button class="next" id="btn-again">Play Again</button>
+          <button class="back-link" id="btn-results-history">View History</button>
+          <button class="back-link" id="btn-results-menu">Main Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ HISTORY ============ -->
+    <div class="screen" id="screen-history">
+      <h2>Previous Attempts</h2>
+      <div class="subtitle">Sorted by most recent. Lower average time is better.</div>
+      <div id="history-content"></div>
+      <div class="history-actions">
+        <button class="back-link" id="btn-history-back">← Main Menu</button>
+        <button class="danger" id="btn-history-clear">Clear History</button>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+/* =========================================================
+   Panel model & rendering (unchanged from prior version)
+   ========================================================= */
+
+const TOKENS = ['triangle', 'square', 'circle', 'pentagon', 'hexagon', 'diamond'];
+function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function randInt(n) { return Math.floor(Math.random() * n); }
+function canonicalPanel(p) {
+  // Strip purely-internal fields and normalize so visual equivalents compare equal.
+  const out = {};
+  if (p.divider) out.divider = true;
+  if (p.shaded && p.shaded.length) out.shaded = [...p.shaded].sort((a, b) => a - b);
+  if (p.quadrants && p.quadrants.some(q => q)) {
+    out.quadrants = p.quadrants.map(q => {
+      if (!q) return null;
+      const t = { kind: q.kind };
+      if (q.fill) t.fill = q.fill;
+      if (q.rot)  t.rot = ((q.rot % 360) + 360) % 360;
+      if (q.count) t.count = q.count;
+      return t;
+    });
+  }
+  if (p.center) {
+    out.center = { kind: p.center.kind };
+    if (p.center.fill) out.center.fill = p.center.fill;
+    if (p.center.rot)  out.center.rot = ((p.center.rot % 360) + 360) % 360;
+  }
+  return out;
+}
+function panelEq(a, b) { return JSON.stringify(canonicalPanel(a)) === JSON.stringify(canonicalPanel(b)); }
+
+function tokenSvg(token, cx, cy, size) {
+  const { kind, fill, rot = 0, count } = token;
+  const stroke = '#111';
+  const sw = 2;
+  const fillAttr = fill === 'solid' ? '#111' : 'white';
+  const r = size / 2;
+  const transform = `transform="rotate(${rot} ${cx} ${cy})"`;
+  if (kind === 'circle')
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fillAttr}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  if (kind === 'square')
+    return `<rect x="${cx-r}" y="${cy-r}" width="${size}" height="${size}" fill="${fillAttr}" stroke="${stroke}" stroke-width="${sw}" ${transform}/>`;
+  if (kind === 'triangle') {
+    const pts = `${cx},${cy-r} ${cx-r},${cy+r*0.85} ${cx+r},${cy+r*0.85}`;
+    return `<polygon points="${pts}" fill="${fillAttr}" stroke="${stroke}" stroke-width="${sw}" ${transform}/>`;
+  }
+  if (kind === 'diamond') {
+    const pts = `${cx},${cy-r} ${cx+r},${cy} ${cx},${cy+r} ${cx-r},${cy}`;
+    return `<polygon points="${pts}" fill="${fillAttr}" stroke="${stroke}" stroke-width="${sw}" ${transform}/>`;
+  }
+  if (kind === 'pentagon' || kind === 'hexagon') {
+    const n = kind === 'pentagon' ? 5 : 6;
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const ang = (2 * Math.PI / n) * i - Math.PI / 2;
+      pts.push(`${cx + r * Math.cos(ang)},${cy + r * Math.sin(ang)}`);
+    }
+    return `<polygon points="${pts.join(' ')}" fill="${fillAttr}" stroke="${stroke}" stroke-width="${sw}" ${transform}/>`;
+  }
+  if (kind === 'dots') {
+    const n = count || 1;
+    let svg = '';
+    const dotR = 4, spacing = 9;
+    const start = cx - ((n - 1) * spacing) / 2;
+    for (let i = 0; i < n; i++)
+      svg += `<circle cx="${start + i * spacing}" cy="${cy}" r="${dotR}" fill="#111"/>`;
+    return svg;
+  }
+  if (kind === 'arrow') {
+    const pts = `${cx-r*0.6},${cy-r*0.7} ${cx+r*0.7},${cy} ${cx-r*0.6},${cy+r*0.7}`;
+    return `<polygon points="${pts}" fill="${fillAttr}" stroke="${stroke}" stroke-width="${sw}" ${transform}/>`;
+  }
+  return '';
+}
+
+function tokenSvgWhite(token, cx, cy, size) {
+  const { kind, rot = 0 } = token;
+  const stroke = 'white', sw = 2;
+  const fillAttr = token.fill === 'solid' ? 'white' : '#111';
+  const r = size / 2;
+  const transform = `transform="rotate(${rot} ${cx} ${cy})"`;
+  if (kind === 'circle')
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fillAttr}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  if (kind === 'square')
+    return `<rect x="${cx-r}" y="${cy-r}" width="${size}" height="${size}" fill="${fillAttr}" stroke="${stroke}" stroke-width="${sw}" ${transform}/>`;
+  if (kind === 'triangle') {
+    const pts = `${cx},${cy-r} ${cx-r},${cy+r*0.85} ${cx+r},${cy+r*0.85}`;
+    return `<polygon points="${pts}" fill="${fillAttr}" stroke="${stroke}" stroke-width="${sw}" ${transform}/>`;
+  }
+  if (kind === 'diamond') {
+    const pts = `${cx},${cy-r} ${cx+r},${cy} ${cx},${cy+r} ${cx-r},${cy}`;
+    return `<polygon points="${pts}" fill="${fillAttr}" stroke="${stroke}" stroke-width="${sw}" ${transform}/>`;
+  }
+  if (kind === 'pentagon' || kind === 'hexagon') {
+    const n = kind === 'pentagon' ? 5 : 6;
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const ang = (2 * Math.PI / n) * i - Math.PI / 2;
+      pts.push(`${cx + r * Math.cos(ang)},${cy + r * Math.sin(ang)}`);
+    }
+    return `<polygon points="${pts.join(' ')}" fill="${fillAttr}" stroke="${stroke}" stroke-width="${sw}" ${transform}/>`;
+  }
+  if (kind === 'dots') {
+    const n = token.count || 1;
+    let svg = '', dotR = 4, spacing = 9;
+    const start = cx - ((n - 1) * spacing) / 2;
+    for (let i = 0; i < n; i++) svg += `<circle cx="${start + i * spacing}" cy="${cy}" r="${dotR}" fill="white"/>`;
+    return svg;
+  }
+  return '';
+}
+
+function renderPanel(panel, size = 120) {
+  const s = size;
+  const half = s / 2;
+  const inset = 6;
+  const tokenSize = 28;
+  const centers = [
+    [half / 2 + inset / 2, half / 2 + inset / 2],
+    [half + half / 2 - inset / 2, half / 2 + inset / 2],
+    [half + half / 2 - inset / 2, half + half / 2 - inset / 2],
+    [half / 2 + inset / 2, half + half / 2 - inset / 2],
+  ];
+  let bg = '';
+  if (panel.shaded && panel.shaded.length) {
+    const quadRects = [[0, 0],[half, 0],[half, half],[0, half]];
+    for (const q of panel.shaded) {
+      const [x, y] = quadRects[q];
+      bg += `<rect x="${x}" y="${y}" width="${half}" height="${half}" fill="#111"/>`;
+    }
+  }
+  let divider = '';
+  if (panel.divider) {
+    divider = `
+      <line x1="${half}" y1="0" x2="${half}" y2="${s}" stroke="#111" stroke-width="1.5"/>
+      <line x1="0" y1="${half}" x2="${s}" y2="${half}" stroke="#111" stroke-width="1.5"/>`;
+  }
+  let content = '';
+  if (panel.quadrants) {
+    for (let i = 0; i < 4; i++) {
+      const tok = panel.quadrants[i];
+      if (!tok) continue;
+      const [cx, cy] = centers[i];
+      if (panel.shaded && panel.shaded.includes(i)) continue;
+      content += tokenSvg(tok, cx, cy, tokenSize);
+    }
+  }
+  if (panel.shaded && panel.quadrants) {
+    for (let i = 0; i < 4; i++) {
+      if (!panel.shaded.includes(i)) continue;
+      const tok = panel.quadrants[i];
+      if (!tok) continue;
+      const [cx, cy] = centers[i];
+      content += tokenSvgWhite(tok, cx, cy, tokenSize);
+    }
+  }
+  if (panel.center) content += tokenSvg(panel.center, half, half, 36);
+  return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}">${bg}${divider}${content}</svg>`;
+}
+
+/* ---------- Pattern Generators ---------- */
+
+const SHAPE_POOL = ['triangle', 'square', 'circle', 'pentagon', 'hexagon', 'diamond'];
+
+function rotateQuadrants(quads, k) {
+  const out = [null, null, null, null];
+  for (let i = 0; i < 4; i++) out[(i + k) % 4] = quads[i];
+  return out;
+}
+
+function patternShadeRotate(difficulty) {
+  const len = 4;
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  const startQuad = randInt(4);
+  const includeTokens = difficulty !== 'medium' && Math.random() < 0.6;
+  let tokens = null;
+  if (includeTokens) {
+    tokens = [null, null, null, null];
+    const numTokens = 2 + randInt(2);
+    const pool = [...SHAPE_POOL];
+    for (let i = 0; i < numTokens; i++) {
+      const q = randInt(4);
+      if (tokens[q]) continue;
+      tokens[q] = { kind: pool.splice(randInt(pool.length), 1)[0], fill: Math.random() < 0.5 ? 'solid' : 'outline' };
+    }
+  }
+  const panels = [];
+  for (let i = 0; i < len; i++) {
+    const shadedQ = (startQuad + dir * i + 400) % 4;
+    const panel = { divider: true, shaded: [shadedQ] };
+    if (tokens) panel.quadrants = rotateQuadrants(tokens, (dir * i + 400) % 4);
+    panels.push(panel);
+  }
+  const lastShaded = (startQuad + dir * len + 400) % 4;
+  const next = { divider: true, shaded: [lastShaded] };
+  if (tokens) next.quadrants = rotateQuadrants(tokens, (dir * len + 400) % 4);
+  return { sequence: panels, next };
+}
+
+function patternDoubleShade(difficulty) {
+  const len = 4;
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  const startQ = randInt(4);
+  const offset = Math.random() < 0.5 ? 2 : 1;
+  const panels = [];
+  for (let i = 0; i < len; i++) {
+    const q1 = (startQ + dir * i + 400) % 4;
+    const q2 = (q1 + offset) % 4;
+    panels.push({ divider: true, shaded: [q1, q2] });
+  }
+  const lastQ1 = (startQ + dir * len + 400) % 4;
+  const lastQ2 = (lastQ1 + offset) % 4;
+  return { sequence: panels, next: { divider: true, shaded: [lastQ1, lastQ2] } };
+}
+
+function patternTokenRotateFill(difficulty) {
+  const len = 4;
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  const startQ = randInt(4);
+  const kind = rand(SHAPE_POOL);
+  const startFill = Math.random() < 0.5 ? 'solid' : 'outline';
+  const flipEvery = difficulty === 'expert' ? 1 : (Math.random() < 0.5 ? 1 : 2);
+  const panels = [];
+  for (let i = 0; i < len; i++) {
+    const q = (startQ + dir * i + 400) % 4;
+    const fill = (Math.floor(i / flipEvery) % 2 === 0) ? startFill : (startFill === 'solid' ? 'outline' : 'solid');
+    const quads = [null, null, null, null];
+    quads[q] = { kind, fill };
+    panels.push({ divider: true, quadrants: quads });
+  }
+  const qN = (startQ + dir * len + 400) % 4;
+  const fillN = (Math.floor(len / flipEvery) % 2 === 0) ? startFill : (startFill === 'solid' ? 'outline' : 'solid');
+  const quadsN = [null, null, null, null];
+  quadsN[qN] = { kind, fill: fillN };
+  return { sequence: panels, next: { divider: true, quadrants: quadsN } };
+}
+
+function patternTwoCounterRotate(difficulty) {
+  const len = 4;
+  const startA = randInt(4);
+  const startB = (startA + 2) % 4;
+  const kindA = rand(SHAPE_POOL);
+  const kindB = rand(SHAPE_POOL.filter(k => k !== kindA));
+  const fillA = Math.random() < 0.5 ? 'solid' : 'outline';
+  const fillB = Math.random() < 0.5 ? 'solid' : 'outline';
+  const panels = [];
+  for (let i = 0; i < len; i++) {
+    const qA = (startA + i + 400) % 4;
+    const qB = (startB - i + 400) % 4;
+    const quads = [null, null, null, null];
+    quads[qA] = { kind: kindA, fill: fillA };
+    if (qB !== qA) quads[qB] = { kind: kindB, fill: fillB };
+    panels.push({ divider: true, quadrants: quads });
+  }
+  const qAN = (startA + len + 400) % 4;
+  const qBN = (startB - len + 400) % 4;
+  const quadsN = [null, null, null, null];
+  quadsN[qAN] = { kind: kindA, fill: fillA };
+  if (qBN !== qAN) quadsN[qBN] = { kind: kindB, fill: fillB };
+  return { sequence: panels, next: { divider: true, quadrants: quadsN } };
+}
+
+function patternMorphCount(difficulty) {
+  const len = 4;
+  const morphSeq = ['triangle', 'square', 'pentagon', 'hexagon'];
+  const startIdx = randInt(2);
+  const morphDir = Math.random() < 0.5 ? 1 : -1;
+  const dotDir = Math.random() < 0.5 ? 1 : -1;
+  const startCount = dotDir === 1 ? 1 : 4;
+  const panels = [];
+  for (let i = 0; i < len; i++) {
+    const morphI = ((startIdx + morphDir * i) % morphSeq.length + morphSeq.length) % morphSeq.length;
+    const cnt = Math.max(1, Math.min(5, startCount + dotDir * i));
+    const quads = [null, null, null, null];
+    quads[0] = { kind: morphSeq[morphI], fill: 'solid' };
+    quads[2] = { kind: 'dots', count: cnt };
+    panels.push({ divider: false, quadrants: quads });
+  }
+  const morphN = ((startIdx + morphDir * len) % morphSeq.length + morphSeq.length) % morphSeq.length;
+  const cntN = Math.max(1, Math.min(5, startCount + dotDir * len));
+  const quadsN = [null, null, null, null];
+  quadsN[0] = { kind: morphSeq[morphN], fill: 'solid' };
+  quadsN[2] = { kind: 'dots', count: cntN };
+  return { sequence: panels, next: { divider: false, quadrants: quadsN } };
+}
+
+function patternArrowRotate(difficulty) {
+  const len = 4;
+  const step = difficulty === 'expert' ? (Math.random() < 0.5 ? 45 : -45) : (Math.random() < 0.5 ? 90 : -90);
+  const startRot = randInt(8) * 45;
+  const fillToggles = difficulty === 'expert';
+  const panels = [];
+  for (let i = 0; i < len; i++) {
+    const rot = (startRot + step * i + 720) % 360;
+    const fill = fillToggles ? (i % 2 === 0 ? 'solid' : 'outline') : 'solid';
+    panels.push({ center: { kind: 'arrow', fill, rot } });
+  }
+  const rotN = (startRot + step * len + 720) % 360;
+  const fillN = fillToggles ? (len % 2 === 0 ? 'solid' : 'outline') : 'solid';
+  return { sequence: panels, next: { center: { kind: 'arrow', fill: fillN, rot: rotN } } };
+}
+
+function patternMultiFillToggle(difficulty) {
+  const len = 4;
+  const kinds = [];
+  const pool = [...SHAPE_POOL];
+  for (let i = 0; i < 4; i++) kinds.push(pool.splice(randInt(pool.length), 1)[0]);
+  const cadences = [1, 1, 2, 2];
+  for (let i = cadences.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [cadences[i], cadences[j]] = [cadences[j], cadences[i]];
+  }
+  const startFills = kinds.map(() => Math.random() < 0.5 ? 'solid' : 'outline');
+  function panelAt(i) {
+    const quads = [null, null, null, null];
+    for (let q = 0; q < 4; q++) {
+      const toggles = Math.floor(i / cadences[q]);
+      const fill = (toggles % 2 === 0) ? startFills[q] : (startFills[q] === 'solid' ? 'outline' : 'solid');
+      quads[q] = { kind: kinds[q], fill };
+    }
+    return { divider: true, quadrants: quads };
+  }
+  const panels = [];
+  for (let i = 0; i < len; i++) panels.push(panelAt(i));
+  return { sequence: panels, next: panelAt(len) };
+}
+
+const PATTERN_SETS = {
+  medium: [patternShadeRotate, patternTokenRotateFill, patternArrowRotate],
+  hard:   [patternShadeRotate, patternDoubleShade, patternTokenRotateFill, patternTwoCounterRotate, patternMorphCount, patternMultiFillToggle],
+  expert: [patternDoubleShade, patternTwoCounterRotate, patternMorphCount, patternMultiFillToggle, patternArrowRotate],
+};
+
+/* ---------- Distractors ---------- */
+
+function makeDistractor(correct, sequence) {
+  const strategies = [
+    () => deepClone(sequence[sequence.length - 1]),
+    () => deepClone(sequence[0]),
+    () => {
+      const p = deepClone(correct);
+      if (p.shaded) p.shaded = p.shaded.map(q => (q + 2) % 4);
+      else if (p.quadrants) p.quadrants = rotateQuadrants(p.quadrants, 1);
+      else if (p.center) p.center = { ...p.center, rot: (p.center.rot + 90) % 360 };
+      return p;
+    },
+    () => {
+      const p = deepClone(correct);
+      if (p.quadrants) {
+        const idxs = p.quadrants.map((q, i) => q ? i : -1).filter(i => i >= 0);
+        if (idxs.length > 0) {
+          const i = rand(idxs);
+          if (p.quadrants[i].fill) p.quadrants[i].fill = p.quadrants[i].fill === 'solid' ? 'outline' : 'solid';
+        }
+      } else if (p.center && p.center.fill) {
+        p.center.fill = p.center.fill === 'solid' ? 'outline' : 'solid';
+      }
+      return p;
+    },
+    () => {
+      const p = deepClone(correct);
+      if (p.quadrants) {
+        const idxs = p.quadrants.map((q, i) => q && q.kind !== 'dots' ? i : -1).filter(i => i >= 0);
+        if (idxs.length > 0) {
+          const i = rand(idxs);
+          const others = SHAPE_POOL.filter(k => k !== p.quadrants[i].kind);
+          p.quadrants[i].kind = rand(others);
+        }
+      }
+      return p;
+    },
+    () => {
+      const p = deepClone(correct);
+      if (p.shaded) p.shaded = p.shaded.map(q => [0, 3, 2, 1][q]);
+      if (p.quadrants) p.quadrants = [p.quadrants[1], p.quadrants[0], p.quadrants[3], p.quadrants[2]];
+      return p;
+    },
+  ];
+  for (let attempts = 0; attempts < 8; attempts++) {
+    const cand = rand(strategies)();
+    if (!panelEq(cand, correct)) return cand;
+  }
+  return { divider: true, shaded: [randInt(4)] };
+}
+
+function generateProblem(difficulty) {
+  const generators = PATTERN_SETS[difficulty] || PATTERN_SETS.hard;
+  const { sequence, next } = rand(generators)(difficulty);
+  const options = [deepClone(next)];
+  let guard = 0;
+  while (options.length < 5 && guard++ < 80) {
+    const d = makeDistractor(next, sequence);
+    if (options.some(o => panelEq(o, d))) continue;
+    options.push(d);
+  }
+  // Deterministic fallback: try each quadrant as a shaded variant, then each as a 2-quadrant variant.
+  const fallbackCandidates = [];
+  for (let q = 0; q < 4; q++) fallbackCandidates.push({ divider: true, shaded: [q] });
+  for (let q = 0; q < 4; q++) fallbackCandidates.push({ divider: true, shaded: [q, (q + 1) % 4] });
+  for (let q = 0; q < 4; q++) fallbackCandidates.push({ divider: true, shaded: [q, (q + 2) % 4] });
+  for (const c of fallbackCandidates) {
+    if (options.length >= 5) break;
+    if (options.some(o => panelEq(o, c))) continue;
+    options.push(c);
+  }
+  for (let i = options.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [options[i], options[j]] = [options[j], options[i]];
+  }
+  return { sequence, options, answerIndex: options.findIndex(o => panelEq(o, next)) };
+}
+
+/* =========================================================
+   App state & screens
+   ========================================================= */
+
+const ROUND_LENGTH = 10;
+const HISTORY_KEY = 'irt-history-v1';
+
+let difficulty = 'hard';
+let round = null; // { problems: [{ time, correct }], current: null, currentIdx, startTime, timerInterval, answered }
+
+const screens = {
+  menu:    document.getElementById('screen-menu'),
+  round:   document.getElementById('screen-round'),
+  results: document.getElementById('screen-results'),
+  history: document.getElementById('screen-history'),
+};
+
+function showScreen(name) {
+  Object.values(screens).forEach(s => s.classList.remove('active'));
+  screens[name].classList.add('active');
+}
+
+/* ---------- History storage ---------- */
+
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+  } catch { return []; }
+}
+function saveHistoryEntry(entry) {
+  const h = loadHistory();
+  h.unshift(entry);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 100)));
+}
+function clearHistory() {
+  localStorage.removeItem(HISTORY_KEY);
+}
+
+/* ---------- Round / problem flow ---------- */
+
+const ui = {
+  sequence: document.getElementById('sequence'),
+  options: document.getElementById('options'),
+  msg: document.getElementById('msg'),
+  next: document.getElementById('next'),
+  timer: document.getElementById('timer'),
+  problemNum: document.getElementById('problemNum'),
+  score: document.getElementById('score'),
+  progress: document.getElementById('progress'),
+};
+
+function startRound() {
+  round = {
+    problems: [],         // every attempt: { time, correct }
+    current: null,
+    attemptIdx: 0,        // total attempts (correct + wrong)
+    correctCount: 0,      // correct answers so far — goal is ROUND_LENGTH
+    startTime: 0,
+    timerInterval: null,
+    answered: false,
+    difficulty,
+  };
+  ui.score.textContent = '0';
+  ui.problemNum.textContent = '1';
+  showScreen('round');
+  loadNextProblem();
+}
+
+function loadNextProblem() {
+  round.attemptIdx++;
+  round.current = generateProblem(round.difficulty);
+  round.answered = false;
+  ui.problemNum.textContent = round.attemptIdx;
+  ui.progress.style.width = (round.correctCount / ROUND_LENGTH * 100) + '%';
+  ui.msg.textContent = '';
+  ui.msg.className = 'msg';
+  ui.next.hidden = true;
+
+  const seqHTML = round.current.sequence
+    .map(p => `<div class="tile">${renderPanel(p, 120)}</div>`)
+    .join('<div class="arrow">→</div>');
+  ui.sequence.innerHTML = seqHTML + `<div class="arrow">→</div><div class="tile question">?</div>`;
+
+  const letters = ['A', 'B', 'C', 'D', 'E'];
+  ui.options.innerHTML = round.current.options
+    .map((p, i) => `
+      <div class="option" data-idx="${i}">
+        <div class="tile">${renderPanel(p, 110)}</div>
+        <div class="letter">${letters[i]}</div>
+      </div>`).join('');
+  ui.options.querySelectorAll('.option').forEach(el => {
+    el.addEventListener('click', () => handleAnswer(parseInt(el.dataset.idx, 10), el));
+  });
+
+  startProblemTimer();
+}
+
+function startProblemTimer() {
+  round.startTime = performance.now();
+  if (round.timerInterval) clearInterval(round.timerInterval);
+  round.timerInterval = setInterval(() => {
+    const elapsed = (performance.now() - round.startTime) / 1000;
+    ui.timer.textContent = elapsed.toFixed(1) + 's';
+  }, 100);
+}
+
+function stopProblemTimer() {
+  if (round.timerInterval) clearInterval(round.timerInterval);
+  round.timerInterval = null;
+  return (performance.now() - round.startTime) / 1000;
+}
+
+function handleAnswer(idx, el) {
+  if (round.answered) return;
+  round.answered = true;
+  const elapsed = stopProblemTimer();
+  const correct = idx === round.current.answerIndex;
+  round.problems.push({ time: elapsed, correct });
+  if (correct) round.correctCount++;
+
+  ui.options.querySelectorAll('.option').forEach(o => o.classList.add('disabled'));
+  el.classList.add(correct ? 'correct' : 'wrong');
+  if (!correct) {
+    const right = ui.options.querySelector(`[data-idx="${round.current.answerIndex}"]`);
+    if (right) right.classList.add('correct');
+  }
+  ui.msg.textContent = correct
+    ? `Correct! ${elapsed.toFixed(1)}s — ${round.correctCount}/${ROUND_LENGTH}`
+    : `Not quite (${elapsed.toFixed(1)}s) — moving to a new problem.`;
+  ui.msg.className = 'msg ' + (correct ? 'correct' : 'wrong');
+
+  ui.score.textContent = round.correctCount;
+  ui.progress.style.width = (round.correctCount / ROUND_LENGTH * 100) + '%';
+
+  if (round.correctCount >= ROUND_LENGTH) {
+    ui.next.textContent = 'See Results →';
+  } else {
+    ui.next.textContent = correct ? 'Next →' : 'New Problem →';
+  }
+  ui.next.hidden = false;
+  ui.next.focus();
+}
+
+function nextOrFinish() {
+  if (round.correctCount >= ROUND_LENGTH) {
+    finishRound();
+  } else {
+    loadNextProblem();
+  }
+}
+
+function finishRound() {
+  const totalTime = round.problems.reduce((s, p) => s + p.time, 0);
+  const avg = totalTime / round.problems.length;
+  const correctCount = round.problems.filter(p => p.correct).length;
+
+  const entry = {
+    date: new Date().toISOString(),
+    difficulty: round.difficulty,
+    avg,
+    totalTime,
+    correct: correctCount,
+    total: round.problems.length,
+    problems: round.problems,
+  };
+  saveHistoryEntry(entry);
+  renderResults(entry);
+  showScreen('results');
+}
+
+function renderResults(entry) {
+  document.getElementById('result-avg').textContent = entry.avg.toFixed(2) + 's';
+  document.getElementById('result-correct').textContent = `${entry.correct}/${entry.total}`;
+  document.getElementById('result-total').textContent = entry.totalTime.toFixed(1) + 's';
+  document.getElementById('result-diff').textContent = entry.difficulty.charAt(0).toUpperCase() + entry.difficulty.slice(1);
+  const rows = entry.problems.map((p, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><span class="badge ${p.correct ? 'correct' : 'wrong'}">${p.correct ? 'Correct' : 'Wrong'}</span></td>
+      <td class="right">${p.time.toFixed(2)}s</td>
+    </tr>`).join('');
+  document.getElementById('result-rows').innerHTML = rows;
+}
+
+/* ---------- History screen ---------- */
+
+function renderHistory() {
+  const h = loadHistory();
+  const container = document.getElementById('history-content');
+  if (!h.length) {
+    container.innerHTML = `<div class="history-empty">No previous attempts yet. Play a round to see your results here.</div>`;
+    return;
+  }
+  const rows = h.map((e, i) => {
+    const date = new Date(e.date);
+    const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const diff = e.difficulty.charAt(0).toUpperCase() + e.difficulty.slice(1);
+    return `
+      <div class="history-row">
+        <div>
+          <div style="font-weight:600;">${dateStr}</div>
+          <div style="color:var(--muted); font-size:12px; margin-top:2px;">${diff}</div>
+        </div>
+        <div class="num col-problems">${e.correct}/${e.total} correct</div>
+        <div class="num">${e.totalTime.toFixed(1)}s total</div>
+        <div class="avg">${e.avg.toFixed(2)}s avg</div>
+      </div>`;
+  }).join('');
+  container.innerHTML = `
+    <div class="history-list">
+      <div class="history-row head">
+        <div>When</div>
+        <div class="col-problems">Score</div>
+        <div>Total</div>
+        <div>Avg Time</div>
+      </div>
+      ${rows}
+    </div>`;
+}
+
+/* ---------- Wire up events ---------- */
+
+document.querySelectorAll('#diff-row button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    difficulty = btn.dataset.diff;
+    document.querySelectorAll('#diff-row button').forEach(b => b.classList.toggle('active', b === btn));
+  });
+});
+
+document.getElementById('btn-start').addEventListener('click', startRound);
+document.getElementById('btn-history').addEventListener('click', () => { renderHistory(); showScreen('history'); });
+document.getElementById('btn-quit').addEventListener('click', () => {
+  if (round && round.timerInterval) clearInterval(round.timerInterval);
+  showScreen('menu');
+});
+
+ui.next.addEventListener('click', nextOrFinish);
+
+document.getElementById('btn-again').addEventListener('click', startRound);
+document.getElementById('btn-results-history').addEventListener('click', () => { renderHistory(); showScreen('history'); });
+document.getElementById('btn-results-menu').addEventListener('click', () => showScreen('menu'));
+
+document.getElementById('btn-history-back').addEventListener('click', () => showScreen('menu'));
+document.getElementById('btn-history-clear').addEventListener('click', () => {
+  if (confirm('Clear all previous attempts? This cannot be undone.')) {
+    clearHistory();
+    renderHistory();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (!screens.round.classList.contains('active')) return;
+  if (e.key === 'Enter' && !ui.next.hidden) nextOrFinish();
+  if (!round || round.answered) return;
+  const map = { a: 0, b: 1, c: 2, d: 3, e: 4 };
+  if (e.key.toLowerCase() in map) {
+    const idx = map[e.key.toLowerCase()];
+    const el = ui.options.querySelector(`[data-idx="${idx}"]`);
+    if (el) handleAnswer(idx, el);
+  }
+});
+</script>
+</body>
+</html>
