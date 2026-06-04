@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Inductive Reasoning Game</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -607,6 +608,9 @@
   @media (max-width: 720px) {
     /* Align content to the top so it doesn't float in the middle of tall phone screens */
     body { align-items: flex-start; padding: 12px; }
+    /* The fixed account widget sits top-right; reserve space so it can't overlap content.
+       Login has no widget, so it keeps its own centered layout. */
+    body:not(.login-active) .container { padding-top: 96px; }
     .options { grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .tile { width: 80px; height: 80px; }
     .option .tile { width: 88px; height: 88px; }
