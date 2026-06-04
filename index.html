@@ -441,12 +441,13 @@
     margin-bottom: 32px;
     line-height: 1.5;
   }
-  #btn-login-google, #btn-skip-login {
+  #btn-login-google, #btn-skip-login,
+  #btn-invite-google, #btn-invite-skip {
     width: 280px;
     padding: 12px 20px;
   }
-  #btn-login-google { margin-bottom: 28px; }
-  #btn-skip-login {
+  #btn-login-google, #btn-invite-google { margin-bottom: 28px; }
+  #btn-skip-login, #btn-invite-skip {
     background: transparent;
     color: var(--muted);
     border: 1px solid var(--border);
@@ -454,7 +455,7 @@
     font-size: 14px;
     cursor: pointer;
   }
-  #btn-skip-login:hover { color: var(--text); border-color: var(--accent); }
+  #btn-skip-login:hover, #btn-invite-skip:hover { color: var(--text); border-color: var(--accent); }
 
   /* ----- Account / Auth ----- */
   .account-bar {
@@ -464,6 +465,29 @@
     z-index: 50;
     display: flex;
     flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  .account-trigger {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--panel-light);
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    color: var(--muted);
+  }
+  .account-trigger:hover { border-color: var(--accent); }
+  .account-trigger img { width: 100%; height: 100%; object-fit: cover; }
+  .account-trigger svg { width: 22px; height: 22px; display: block; }
+  .account-panel {
+    display: none;
+    flex-direction: column;
     align-items: center;
     width: max-content;
     gap: 10px;
@@ -472,6 +496,7 @@
     border: 1px solid var(--border);
     border-radius: 12px;
   }
+  .account-bar.open .account-panel { display: flex; }
   .account-bar .signin-text {
     color: var(--muted);
     font-size: 12px;
@@ -503,7 +528,7 @@
     cursor: pointer;
   }
   .btn-small:hover { color: var(--text); border-color: var(--accent); }
-  .account-bar .btn-small { align-self: stretch; }
+  .account-panel .btn-small { align-self: stretch; }
   .btn-small.primary {
     background: var(--accent);
     color: white;
@@ -586,6 +611,63 @@
     margin-left: 6px;
   }
 
+  /* ----- Friend Groups ----- */
+  #groups-content { margin: 20px 0; }
+  .group-create {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .group-create input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel-light);
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .group-create input:focus { outline: none; border-color: var(--accent); }
+  .group-create button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .group-create button:hover { background: var(--accent-hover); }
+  .group-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .group-item .group-name { font-weight: 500; flex: 1; min-width: 120px; }
+  .group-item .group-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .group-item .group-actions button {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .group-item .group-actions button:hover { color: var(--text); border-color: var(--accent); }
+  .group-item .group-actions button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .group-item .group-actions button.primary:hover { background: var(--accent-hover); }
+
   /* ----- Google sign-in button ----- */
   .btn-google {
     display: inline-flex;
@@ -608,9 +690,9 @@
   @media (max-width: 720px) {
     /* Align content to the top so it doesn't float in the middle of tall phone screens */
     body { align-items: flex-start; padding: 12px; }
-    /* The fixed account widget sits top-right; reserve space so it can't overlap content.
+    /* The fixed account button sits top-right; reserve space so it can't overlap content.
        Login has no widget, so it keeps its own centered layout. */
-    body:not(.login-active) .container { padding-top: 96px; }
+    body:not(.login-active) .container { padding-top: 64px; }
     .options { grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .tile { width: 80px; height: 80px; }
     .option .tile { width: 88px; height: 88px; }
@@ -620,7 +702,6 @@
     .account-bar {
       top: 12px;
       right: 12px;
-      padding: 12px;
       gap: 8px;
     }
     /* Tighten vertical rhythm on the game screen */
@@ -657,6 +738,16 @@
       </div>
     </div>
 
+    <!-- ============ INVITE LANDING ============ -->
+    <div class="screen login" id="screen-invite">
+      <div class="login-card">
+        <h1 id="invite-heading">You're invited!</h1>
+        <p class="subtitle" id="invite-subtitle">Loading invite…</p>
+        <button class="btn-google" id="btn-invite-google"></button>
+        <button class="back-link" id="btn-invite-skip">Not now — maybe later</button>
+      </div>
+    </div>
+
     <!-- ============ MAIN MENU ============ -->
     <div class="screen menu" id="screen-menu">
       <h1>Inductive Reasoning Game</h1>
@@ -672,7 +763,8 @@
       <div class="menu-actions">
         <button class="primary" id="btn-start">Start New Round</button>
         <button id="btn-history">View Previous Attempts</button>
-        <button id="btn-leaderboard">Leaderboard</button>
+        <button id="btn-leaderboard">Global Leaderboard</button>
+        <button id="btn-groups">Friend Groups</button>
       </div>
     </div>
 
@@ -739,17 +831,28 @@
       <div id="history-content"></div>
       <div class="history-actions">
         <button class="back-link" id="btn-history-back">← Main Menu</button>
-        <button class="danger" id="btn-history-clear">Clear History</button>
       </div>
     </div>
 
     <!-- ============ LEADERBOARD ============ -->
     <div class="screen" id="screen-leaderboard">
       <div class="leaderboard">
-        <h2>Leaderboard</h2>
+        <h2>Global Leaderboard</h2>
         <div class="subtitle">Fastest average solve times across all players. Lower is better.</div>
         <div id="leaderboard-content"></div>
         <button class="back-link" id="btn-leaderboard-back">← Main Menu</button>
+      </div>
+    </div>
+
+    <!-- ============ FRIEND GROUPS ============ -->
+    <div class="screen" id="screen-groups">
+      <div class="leaderboard">
+        <h2 id="groups-title">Friend Groups</h2>
+        <div class="subtitle" id="groups-subtitle">Create a group and invite friends to compete on your own leaderboard.</div>
+        <div id="groups-content"></div>
+        <div class="history-actions">
+          <button class="back-link" id="btn-groups-back">← Main Menu</button>
+        </div>
       </div>
     </div>
 
@@ -1091,7 +1194,7 @@ function patternMultiFillToggle(difficulty) {
 }
 
 const PATTERN_SETS = {
-  medium: [patternShadeRotate, patternTokenRotateFill, patternArrowRotate],
+  medium: [patternShadeRotate, patternDoubleShade, patternTokenRotateFill, patternTwoCounterRotate, patternMorphCount, patternMultiFillToggle, patternArrowRotate],
   hard:   [patternShadeRotate, patternDoubleShade, patternTokenRotateFill, patternTwoCounterRotate, patternMorphCount, patternMultiFillToggle],
   expert: [patternDoubleShade, patternTwoCounterRotate, patternMorphCount, patternMultiFillToggle, patternArrowRotate],
 };
@@ -1187,19 +1290,22 @@ let round = null; // { problems: [{ time, correct }], current: null, currentIdx,
 
 const screens = {
   login:       document.getElementById('screen-login'),
+  invite:      document.getElementById('screen-invite'),
   menu:        document.getElementById('screen-menu'),
   round:       document.getElementById('screen-round'),
   results:     document.getElementById('screen-results'),
   history:     document.getElementById('screen-history'),
   leaderboard: document.getElementById('screen-leaderboard'),
+  groups:      document.getElementById('screen-groups'),
 };
 
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
-  // The login screen is its own gate — hide the corner account widget there.
-  document.getElementById('account-bar').style.display = (name === 'login') ? 'none' : '';
-  document.body.classList.toggle('login-active', name === 'login');
+  // The login & invite screens are pre-auth gates — hide the corner account widget there.
+  const gate = (name === 'login' || name === 'invite');
+  document.getElementById('account-bar').style.display = gate ? 'none' : '';
+  document.body.classList.toggle('login-active', gate);
 }
 
 /* =========================================================
@@ -1268,25 +1374,50 @@ function maybeWelcome() {
 const GOOGLE_BTN = `
   <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;
 
+const PERSON_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"></path></svg>`;
+
 function renderAccountBar() {
   const bar = document.getElementById('account-bar');
   if (!bar) return;
 
   if (!currentUser) {
     bar.innerHTML = `
-      <div class="signin-text">Sign in to save your stats &amp; compete.</div>
-      <button class="btn-google" id="btn-acct-google">${GOOGLE_BTN}<span>Sign in with Google</span></button>`;
+      <button class="account-trigger" id="account-toggle" aria-label="Account">${PERSON_ICON}</button>
+      <div class="account-panel">
+        <div class="signin-text">Sign in to save your stats &amp; compete.</div>
+        <button class="btn-google" id="btn-acct-google">${GOOGLE_BTN}<span>Sign in with Google</span></button>
+      </div>`;
     document.getElementById('btn-acct-google').addEventListener('click', signInWithGoogle);
   } else {
+    const triggerInner = currentUser.picture
+      ? `<img src="${currentUser.picture}" alt="" referrerpolicy="no-referrer">`
+      : PERSON_ICON;
     bar.innerHTML = `
-      <div class="account-info">
-        ${currentUser.picture ? `<img class="avatar" src="${currentUser.picture}" alt="" referrerpolicy="no-referrer">` : ''}
-        <div class="who"><div class="name">${currentUser.name}</div><div class="sub">Account active</div></div>
-      </div>
-      <button class="btn-small" id="btn-signout">Sign out</button>`;
+      <button class="account-trigger" id="account-toggle" aria-label="Account">${triggerInner}</button>
+      <div class="account-panel">
+        <div class="account-info">
+          ${currentUser.picture ? `<img class="avatar" src="${currentUser.picture}" alt="" referrerpolicy="no-referrer">` : ''}
+          <div class="who"><div class="name">${currentUser.name}</div><div class="sub">Account active</div></div>
+        </div>
+        <button class="btn-small" id="btn-signout">Sign out</button>
+      </div>`;
     document.getElementById('btn-signout').addEventListener('click', signOut);
   }
+
+  bar.classList.remove('open');
+  document.getElementById('account-toggle').addEventListener('click', (e) => {
+    e.stopPropagation();
+    bar.classList.toggle('open');
+  });
 }
+
+// Close the expanded panel when clicking anywhere outside it.
+document.addEventListener('click', (e) => {
+  const bar = document.getElementById('account-bar');
+  if (bar && bar.classList.contains('open') && !bar.contains(e.target)) {
+    bar.classList.remove('open');
+  }
+});
 
 /* ---------- Modal ---------- */
 
@@ -1329,11 +1460,6 @@ function saveHistoryEntry(entry) {
 function loadAccountHistory() {
   if (!currentUser) return [];
   return loadHistory().filter(e => e.sub === currentUser.sub);
-}
-function clearHistory() {
-  if (!currentUser) return;
-  const remaining = loadHistory().filter(e => e.sub !== currentUser.sub);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(remaining));
 }
 
 /* ---------- Round / problem flow ---------- */
@@ -1555,13 +1681,13 @@ async function openLeaderboard() {
     .from('scores')
     .select('user_id, display_name, difficulty, avg_solve_ms, accuracy')
     .order('avg_solve_ms', { ascending: true });
-  // Rows are sorted fastest-first, so the first row seen per user is their best.
-  let best = null;
-  if (data) {
-    const seen = new Set();
-    best = data.filter(r => !seen.has(r.user_id) && seen.add(r.user_id)).slice(0, 50);
-  }
-  renderLeaderboard(container, best, error);
+  renderLeaderboard(container, data ? dedupBestPerUser(data) : null, error);
+}
+
+// Rows must already be sorted fastest-first; keeps the first (best) row per user, max 50.
+function dedupBestPerUser(rows) {
+  const seen = new Set();
+  return rows.filter(r => !seen.has(r.user_id) && seen.add(r.user_id)).slice(0, 50);
 }
 
 function renderLeaderboard(container, rows, error) {
@@ -1598,10 +1724,309 @@ function renderLeaderboard(container, rows, error) {
     </div>`;
 }
 
+/* ---------- Friend groups ---------- */
+
+const PENDING_JOIN_KEY = 'irt-pending-join-v1';
+const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous 0/O/1/I
+let groupsView = { mode: 'list', groupId: null };
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+function genInviteCode(len = 8) {
+  const bytes = new Uint8Array(len);
+  crypto.getRandomValues(bytes);
+  let out = '';
+  for (let i = 0; i < len; i++) out += INVITE_ALPHABET[bytes[i] % INVITE_ALPHABET.length];
+  return out;
+}
+
+function inviteLinkFor(code) {
+  return window.location.origin + window.location.pathname + '#join=' + code;
+}
+
+async function lookupGroupByCode(code) {
+  return await sb.from('groups').select('id, name').eq('invite_code', code).maybeSingle();
+}
+
+async function createGroup(name) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = genInviteCode();
+    const { data, error } = await sb
+      .from('groups')
+      .insert({ name, invite_code: code, created_by: currentUser.id })
+      .select('id')
+      .single();
+    if (error) {
+      if (error.code === '23505') continue; // invite_code collision — regenerate
+      return { error };
+    }
+    const memberRes = await sb
+      .from('group_members')
+      .insert({ group_id: data.id, user_id: currentUser.id, display_name: currentUser.name });
+    return { error: memberRes.error || null, id: data.id };
+  }
+  return { error: { message: 'Could not generate a unique invite code. Try again.' } };
+}
+
+// Returns { ok, already, error }. A primary-key clash means the user is already a member.
+async function joinGroup(groupId) {
+  const { error } = await sb
+    .from('group_members')
+    .insert({ group_id: groupId, user_id: currentUser.id, display_name: currentUser.name });
+  if (error) {
+    if (error.code === '23505') return { ok: true, already: true };
+    return { ok: false, error };
+  }
+  return { ok: true, already: false };
+}
+
+async function leaveGroup(groupId) {
+  return await sb.from('group_members').delete().eq('group_id', groupId).eq('user_id', currentUser.id);
+}
+
+async function loadMyGroups() {
+  const { data, error } = await sb
+    .from('group_members')
+    .select('group_id, groups(id, name, invite_code)')
+    .eq('user_id', currentUser.id);
+  if (error) return { error };
+  const groups = (data || [])
+    .map(r => r.groups)
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { groups };
+}
+
+function openGroups() {
+  if (!requireAccount('friend groups')) return;
+  groupsView = { mode: 'list', groupId: null };
+  showScreen('groups');
+  renderGroupsList();
+}
+
+async function renderGroupsList() {
+  document.getElementById('groups-title').textContent = 'Friend Groups';
+  document.getElementById('groups-subtitle').textContent = 'Create a group and invite friends to compete on your own leaderboard.';
+  const container = document.getElementById('groups-content');
+  container.innerHTML = `<div class="history-empty">Loading…</div>`;
+
+  const { groups, error } = await loadMyGroups();
+  if (error) {
+    container.innerHTML = `<div class="history-empty">Couldn't load your groups. ${esc(error.message)}</div>`;
+    return;
+  }
+
+  const list = groups.length
+    ? groups.map(g => `
+        <div class="group-item" data-group="${g.id}">
+          <div class="group-name">${esc(g.name)}</div>
+          <div class="group-actions">
+            <button class="primary" data-act="board" data-id="${g.id}">View board</button>
+            <button data-act="copy" data-code="${esc(g.invite_code)}">Copy invite link</button>
+            <button data-act="leave" data-id="${g.id}" data-name="${esc(g.name)}">Leave</button>
+          </div>
+        </div>`).join('')
+    : `<div class="history-empty">You're not in any groups yet. Create one above and share the invite link.</div>`;
+
+  container.innerHTML = `
+    <div class="group-create">
+      <input id="group-name-input" type="text" maxlength="60" placeholder="New group name" />
+      <button id="btn-create-group">Create</button>
+    </div>
+    ${list}`;
+
+  const input = document.getElementById('group-name-input');
+  const createBtn = document.getElementById('btn-create-group');
+  async function submitCreate() {
+    const name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    createBtn.disabled = true;
+    createBtn.textContent = 'Creating…';
+    const { error } = await createGroup(name);
+    if (error) {
+      createBtn.disabled = false;
+      createBtn.textContent = 'Create';
+      openModal(`<h3>Couldn't create group</h3><p>${esc(error.message)}</p>
+        <div class="modal-actions"><button class="primary" id="modal-ok">Close</button></div>`);
+      document.getElementById('modal-ok').addEventListener('click', closeModal);
+      return;
+    }
+    renderGroupsList();
+  }
+  createBtn.addEventListener('click', submitCreate);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submitCreate(); });
+
+  container.querySelectorAll('.group-actions button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const act = btn.dataset.act;
+      if (act === 'board') openGroupBoard(btn.dataset.id);
+      else if (act === 'copy') copyInviteLink(btn.dataset.code, btn);
+      else if (act === 'leave') confirmLeaveGroup(btn.dataset.id, btn.dataset.name);
+    });
+  });
+}
+
+async function copyInviteLink(code, btn) {
+  const link = inviteLinkFor(code);
+  try {
+    await navigator.clipboard.writeText(link);
+    const prev = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = prev; }, 1500);
+  } catch {
+    openModal(`<h3>Invite link</h3><p>Copy this link and send it to a friend:</p>
+      <p style="word-break:break-all; color:var(--text);">${esc(link)}</p>
+      <div class="modal-actions"><button class="primary" id="modal-ok">Close</button></div>`);
+    document.getElementById('modal-ok').addEventListener('click', closeModal);
+  }
+}
+
+function confirmLeaveGroup(groupId, name) {
+  openModal(`<h3>Leave group?</h3><p>You'll stop appearing on the “${esc(name)}” leaderboard. You can rejoin with an invite link.</p>
+    <div class="modal-actions">
+      <button class="primary" id="modal-leave">Leave group</button>
+      <button id="modal-cancel">Cancel</button>
+    </div>`);
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-leave').addEventListener('click', async () => {
+    const { error } = await leaveGroup(groupId);
+    closeModal();
+    if (error) {
+      openModal(`<h3>Couldn't leave</h3><p>${esc(error.message)}</p>
+        <div class="modal-actions"><button class="primary" id="modal-ok">Close</button></div>`);
+      document.getElementById('modal-ok').addEventListener('click', closeModal);
+      return;
+    }
+    renderGroupsList();
+  });
+}
+
+async function openGroupBoard(groupId) {
+  groupsView = { mode: 'board', groupId };
+  showScreen('groups');
+  const container = document.getElementById('groups-content');
+  document.getElementById('groups-subtitle').textContent = 'Fastest average solve times in this group. Lower is better.';
+  container.innerHTML = `<div class="history-empty">Loading…</div>`;
+  await loadGroupBoard(groupId, container);
+}
+
+async function loadGroupBoard(groupId, container) {
+  const titleEl = document.getElementById('groups-title');
+
+  const { data: memberRows, error: memberErr } = await sb
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', groupId);
+  if (memberErr) {
+    renderGroupBoardShell(container, () => renderLeaderboard(container, null, memberErr));
+    return;
+  }
+  const ids = (memberRows || []).map(r => r.user_id);
+  if (!ids.length) {
+    titleEl.textContent = 'Group Leaderboard';
+    renderGroupBoardShell(container, () => renderLeaderboard(container, [], null));
+    return;
+  }
+
+  const { data, error } = await sb
+    .from('scores')
+    .select('user_id, display_name, difficulty, avg_solve_ms, accuracy')
+    .in('user_id', ids)
+    .order('avg_solve_ms', { ascending: true });
+  titleEl.textContent = 'Group Leaderboard';
+  renderGroupBoardShell(container, () => renderLeaderboard(container, data ? dedupBestPerUser(data) : null, error));
+}
+
+// renderLeaderboard replaces container contents, so render it first, then prepend a "back to groups" link.
+function renderGroupBoardShell(container, renderBoard) {
+  renderBoard();
+  const back = document.createElement('button');
+  back.className = 'back-link';
+  back.textContent = '← Groups';
+  back.style.marginBottom = '14px';
+  back.addEventListener('click', () => openGroups());
+  container.insertBefore(back, container.firstChild);
+}
+
+/* ---------- Invite-link capture / restore (survives the OAuth redirect) ---------- */
+
+function capturePendingInvite() {
+  const m = window.location.hash.match(/[#&]join=([A-Za-z0-9_-]+)/);
+  if (!m) return;
+  localStorage.setItem(PENDING_JOIN_KEY, m[1]);
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+}
+
+async function resolvePendingInvite() {
+  if (!currentUser) return;
+  const code = localStorage.getItem(PENDING_JOIN_KEY);
+  if (!code) return;
+  const { data: group, error } = await lookupGroupByCode(code);
+  if (error || !group) {
+    localStorage.removeItem(PENDING_JOIN_KEY);
+    openModal(`<h3>Invite link not valid</h3><p>This group invite link is invalid or no longer exists.</p>
+      <div class="modal-actions"><button class="primary" id="modal-ok">Close</button></div>`);
+    document.getElementById('modal-ok').addEventListener('click', closeModal);
+    return;
+  }
+  openModal(`<h3>Join “${esc(group.name)}”?</h3><p>You've been invited to compete on this group's leaderboard.</p>
+    <div class="modal-actions">
+      <button class="primary" id="modal-join">Join this group</button>
+      <button id="modal-notnow">Not now</button>
+    </div>`);
+  document.getElementById('modal-notnow').addEventListener('click', () => {
+    localStorage.removeItem(PENDING_JOIN_KEY);
+    closeModal();
+  });
+  document.getElementById('modal-join').addEventListener('click', async () => {
+    const res = await joinGroup(group.id);
+    localStorage.removeItem(PENDING_JOIN_KEY);
+    closeModal();
+    if (!res.ok) {
+      openModal(`<h3>Couldn't join</h3><p>${esc(res.error.message)}</p>
+        <div class="modal-actions"><button class="primary" id="modal-ok">Close</button></div>`);
+      document.getElementById('modal-ok').addEventListener('click', closeModal);
+      return;
+    }
+    openGroupBoard(group.id);
+  });
+}
+
+// Pre-auth landing shown when a guest opens an invite link. Uses an anon-callable
+// RPC (invite_preview) because the groups table itself is readable only by
+// authenticated users. Returns true if the invite screen was shown.
+async function showInviteLanding() {
+  const code = localStorage.getItem(PENDING_JOIN_KEY);
+  if (!code) return false;
+  showScreen('invite');
+  const sub = document.getElementById('invite-subtitle');
+  const { data, error } = await sb.rpc('invite_preview', { code });
+  const row = data && data[0];
+  if (error || !row) {
+    localStorage.removeItem(PENDING_JOIN_KEY);
+    showScreen('login');
+    return false;
+  }
+  sub.innerHTML = `<strong>${esc(row.inviter_name)}</strong> invited you to join `
+    + `<strong>${esc(row.group_name)}</strong> and compete on its leaderboard.`;
+  return true;
+}
+
 document.getElementById('btn-start').addEventListener('click', startRound);
 document.getElementById('btn-history').addEventListener('click', openHistory);
 document.getElementById('btn-leaderboard').addEventListener('click', openLeaderboard);
 document.getElementById('btn-leaderboard-back').addEventListener('click', () => showScreen('menu'));
+document.getElementById('btn-groups').addEventListener('click', openGroups);
+document.getElementById('btn-groups-back').addEventListener('click', () => showScreen('menu'));
+
+const inviteBtn = document.getElementById('btn-invite-google');
+inviteBtn.innerHTML = `${GOOGLE_BTN}<span>Sign in with Google to join</span>`;
+inviteBtn.addEventListener('click', signInWithGoogle);
+document.getElementById('btn-invite-skip').addEventListener('click', () => showScreen('menu'));
 document.getElementById('btn-quit').addEventListener('click', () => {
   if (round && round.timerInterval) clearInterval(round.timerInterval);
   showScreen('menu');
@@ -1614,12 +2039,6 @@ document.getElementById('btn-results-history').addEventListener('click', openHis
 document.getElementById('btn-results-menu').addEventListener('click', () => showScreen('menu'));
 
 document.getElementById('btn-history-back').addEventListener('click', () => showScreen('menu'));
-document.getElementById('btn-history-clear').addEventListener('click', () => {
-  if (confirm('Clear all previous attempts? This cannot be undone.')) {
-    clearHistory();
-    renderHistory();
-  }
-});
 
 document.addEventListener('keydown', e => {
   if (!screens.round.classList.contains('active')) return;
@@ -1645,6 +2064,7 @@ loginBtn.addEventListener('click', signInWithGoogle);
 document.getElementById('btn-skip-login').addEventListener('click', () => showScreen('menu'));
 
 /* ---------- Boot ---------- */
+capturePendingInvite();
 renderAccountBar();
 
 sb.auth.onAuthStateChange((event, session) => {
@@ -1653,6 +2073,7 @@ sb.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN') {
     if (screens.login.classList.contains('active')) showScreen('menu');
     maybeWelcome();
+    resolvePendingInvite();
   }
 });
 
@@ -1660,7 +2081,15 @@ sb.auth.onAuthStateChange((event, session) => {
   const { data } = await sb.auth.getSession();
   currentUser = userFromSession(data.session);
   renderAccountBar();
-  showScreen(currentUser ? 'menu' : 'login');
+  if (currentUser) {
+    showScreen('menu');
+    resolvePendingInvite();
+  } else if (localStorage.getItem(PENDING_JOIN_KEY)) {
+    showScreen('login');
+    showInviteLanding();
+  } else {
+    showScreen('login');
+  }
 })();
 </script>
 </body>
