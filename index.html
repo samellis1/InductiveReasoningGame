@@ -605,8 +605,10 @@
 
   svg { display: block; }
   @media (max-width: 720px) {
-    .options { grid-template-columns: repeat(3, 1fr); }
-    .tile { width: 90px; height: 90px; }
+    /* Align content to the top so it doesn't float in the middle of tall phone screens */
+    body { align-items: flex-start; padding: 12px; }
+    .options { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .tile { width: 80px; height: 80px; }
     .option .tile { width: 88px; height: 88px; }
     .history-row { grid-template-columns: 1fr 80px 80px; }
     .history-row .col-problems { display: none; }
@@ -617,6 +619,14 @@
       padding: 12px;
       gap: 8px;
     }
+    /* Tighten vertical rhythm on the game screen */
+    .panel { padding: 16px; }
+    .header { margin-bottom: 12px; }
+    .progress-bar { margin-bottom: 14px; }
+    .label { margin-bottom: 8px; }
+    .sequence { gap: 8px; margin-bottom: 16px; }
+    .tile.question { font-size: 36px; }
+    .feedback { margin-top: 14px; }
   }
   /* Mid widths: the centered content would slide under the corner widget,
      so reserve a right gutter for it. Wide screens have natural room. */
@@ -1540,9 +1550,14 @@ async function openLeaderboard() {
   const { data, error } = await sb
     .from('scores')
     .select('user_id, display_name, difficulty, avg_solve_ms, accuracy')
-    .order('avg_solve_ms', { ascending: true })
-    .limit(50);
-  renderLeaderboard(container, data, error);
+    .order('avg_solve_ms', { ascending: true });
+  // Rows are sorted fastest-first, so the first row seen per user is their best.
+  let best = null;
+  if (data) {
+    const seen = new Set();
+    best = data.filter(r => !seen.has(r.user_id) && seen.add(r.user_id)).slice(0, 50);
+  }
+  renderLeaderboard(container, best, error);
 }
 
 function renderLeaderboard(container, rows, error) {

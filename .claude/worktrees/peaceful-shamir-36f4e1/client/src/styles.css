@@ -1,0 +1,40 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-weight: 200; background: #f7f8fa; color: #1f2937; }
+strong, b { font-weight: 700; }
+h1, h2, h3 { font-weight: 700; }
+.app { display: flex; min-height: 100vh; }
+.sidebar { width: 200px; background: #111827; color: #e5e7eb; padding: 20px 12px; }
+.sidebar h1 { font-size: 18px; margin: 0 0 24px 8px; font-weight: 700; }
+.sidebar button { display: block; width: 100%; text-align: left; background: transparent; color: #e5e7eb; border: 0; padding: 10px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; }
+.sidebar button:hover { background: #1f2937; }
+.sidebar button.active { background: #2563eb; color: white; }
+.main { flex: 1; padding: 28px 36px; overflow: auto; }
+.row { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.row h2 { margin: 0; flex: 1; font-size: 24px; font-weight: 700; }
+input, select, textarea, button { font: inherit; }
+input, select, textarea { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; background: white; font-weight: 500; }
+button.primary { background: #2563eb; color: white; border: 0; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 500; }
+button.danger { background: transparent; color: #b91c1c; border: 0; cursor: pointer; font-weight: 500; }
+button.ghost { background: transparent; border: 1px solid #d1d5db; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 500; }
+.card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+.list { background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+.list-item { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; }
+.list-item:last-child { border-bottom: 0; }
+.list-item:hover { background: #f9fafb; }
+.list-item.selected { background: #eff6ff; }
+.muted { color: #6b7280; font-size: 13px; }
+.detail { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+.pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.pipeline .col { background: #eef2f7; border-radius: 8px; padding: 10px; min-height: 200px; transition: background 0.15s, outline 0.15s; outline: 2px dashed transparent; outline-offset: -4px; }
+.pipeline .col.drag-over { background: #dbeafe; outline-color: #2563eb; }
+.deal[draggable="true"] { cursor: grab; }
+.deal[draggable="true"]:active { cursor: grabbing; }
+.pipeline .col h3 { margin: 4px 4px 10px; font-size: 12px; text-transform: uppercase; color: #4b5563; font-weight: 700; }
+.deal { background: white; border-radius: 6px; padding: 10px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.deal .title { font-weight: 700; font-size: 14px; }
+.task { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #f3f4f6; background: white; }
+.task:last-child { border-bottom: 0; }
+.task .title { font-weight: 500; }
+.task.done .title { text-decoration: line-through; color: #9ca3af; font-weight: 200; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tag { display: inline-block; background: #e5e7eb; color: #374151; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 500; }
