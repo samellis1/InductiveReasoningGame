@@ -30,11 +30,11 @@ create index if not exists scores_user_created_idx
 --    rows (see README), run the commented VALIDATE statements below.
 -- ----------------------------------------------------------------------------
 
--- Fastest believable average solve time is ~1.5s/problem; slowest allowed 10min.
+-- Fastest believable average solve time is ~0.5s/problem; slowest allowed 10min.
 alter table public.scores drop constraint if exists scores_avg_solve_ms_range;
 alter table public.scores
   add constraint scores_avg_solve_ms_range
-  check (avg_solve_ms between 1500 and 600000) not valid;
+  check (avg_solve_ms between 500 and 600000) not valid;
 
 alter table public.scores drop constraint if exists scores_accuracy_range;
 alter table public.scores
@@ -139,14 +139,14 @@ commit;
 -- eyeballing what it would delete with the SELECT version first):
 --
 -- select * from public.scores
--- where avg_solve_ms not between 1500 and 600000
+-- where avg_solve_ms not between 500 and 600000
 --    or accuracy not between 0 and 1
 --    or difficulty not in ('easy', 'medium', 'hard', 'expert', 'daily')
 --    or display_name is null
 --    or char_length(display_name) not between 1 and 80;
 --
 -- delete from public.scores
--- where avg_solve_ms not between 1500 and 600000
+-- where avg_solve_ms not between 500 and 600000
 --    or accuracy not between 0 and 1
 --    or difficulty not in ('easy', 'medium', 'hard', 'expert', 'daily')
 --    or display_name is null

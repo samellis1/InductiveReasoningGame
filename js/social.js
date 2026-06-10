@@ -211,15 +211,17 @@ async function loadLeaderboardTab(diff) {
   const subtitle = document.getElementById('leaderboard-subtitle');
   if (subtitle) {
     subtitle.textContent = diff === 'daily'
-      ? "Today's daily challenge — fastest average solve times. Resets at midnight."
-      : `${cap(diff)} difficulty — fastest average solve times across all players. Lower is better.`;
+      ? "Today's daily challenge — ranked by score, then fastest average time. Resets at midnight."
+      : `${cap(diff)} difficulty — ranked by accuracy, then fastest average time.`;
   }
   container.innerHTML = `<div class="history-empty">Loading…</div>`;
 
+  // Rank by accuracy first (most correct wins), then by fastest average time.
   let query = sb
     .from('scores')
     .select('user_id, display_name, difficulty, avg_solve_ms, accuracy')
     .eq('difficulty', diff)
+    .order('accuracy', { ascending: false })
     .order('avg_solve_ms', { ascending: true })
     .limit(500);
   if (diff === 'daily') query = query.gte('created_at', startOfTodayISO());
