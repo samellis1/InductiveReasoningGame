@@ -41,11 +41,25 @@ export const SHAPES = ['triangle', 'square', 'circle', 'pentagon', 'hexagon', 'd
 
 export function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
 
+/* Rotational symmetry per shape, in degrees — rotations that are a multiple
+   of this render pixel-identically, so canonical form folds them together.
+   (A cross at 90° IS a cross at 0°; without this, distractor dedup can pass
+   a "different" panel that draws exactly like the correct answer.)
+   Triangle/arrow are asymmetric as drawn; dots render as a horizontal row. */
+const ROT_SYMMETRY = {
+  circle: 1, square: 90, diamond: 90, cross: 90,
+  hexagon: 60, pentagon: 72, star: 72, dots: 180,
+};
+
 function canonicalToken(t) {
   if (!t) return null;
   const out = { kind: t.kind };
   if (t.fill) out.fill = t.fill;
-  if (t.rot) out.rot = ((t.rot % 360) + 360) % 360;
+  if (t.rot) {
+    const sym = ROT_SYMMETRY[t.kind] || 360;
+    const r = ((t.rot % sym) + sym) % sym;
+    if (r) out.rot = r;
+  }
   if (t.count) out.count = t.count;
   if (t.scale && t.scale !== 1) out.scale = Math.round(t.scale * 100) / 100;
   if (t.inner) out.inner = canonicalToken(t.inner);
