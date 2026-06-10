@@ -52,7 +52,9 @@ function genShadeRotate(R, level) {
   const dir = R.chance(0.5) ? 1 : -1;
   const start = R.int(4);
   const double = level >= 2 && R.chance(0.5);
-  const offset = double ? (R.chance(0.5) ? 1 : 2) : 0;
+  // Pair must be adjacent (offset 1): an opposite pair maps to itself every
+  // two steps, so the walk degenerates and direction becomes unverifiable.
+  const offset = double ? 1 : 0;
   let tokens = null;
   if (level >= 3) {
     tokens = [null, null, null, null];
@@ -100,31 +102,32 @@ function genTokenWalk(R, level) {
   };
 }
 
-/* Two tokens orbit the quadrants at different speeds/directions. */
+/* Two tokens orbit the quadrants in opposite directions. They start an odd
+   number of steps apart, so their gap stays odd and they can never land on
+   the same quadrant — every panel always shows both shapes. (Unequal speeds
+   in a 4-cell cycle force a collision within 5 panels, which silently hides
+   one shape and made the old level-3 variant ambiguous.) */
 function genTwoMovers(R, level) {
   const kindA = R.pick(SHAPES);
   const kindB = R.pick(SHAPES.filter(k => k !== kindA));
   const fillA = R.chance(0.5) ? 'solid' : 'outline';
   const fillB = R.chance(0.5) ? 'solid' : 'outline';
   const startA = R.int(4);
-  const startB = cwq(startA, 2);
-  // level 2: opposite directions, same speed. level 3+: same direction, speeds 1 and 2.
-  const speeds = level >= 3 ? [1, 2] : [1, -1];
+  const startB = cwq(startA, R.chance(0.5) ? 1 : 3);
+  const altFill = level >= 3; // level 3 stacks a fill alternation on top
   const panelAt = i => {
-    const qA = cwq(startA, speeds[0] * i);
-    const qB = cwq(startB, speeds[1] * i);
     const quads = [null, null, null, null];
-    quads[qA] = { kind: kindA, fill: fillA };
-    if (qB !== qA) quads[qB] = { kind: kindB, fill: fillB };
+    quads[cwq(startA, i)] = { kind: kindA, fill: altFill && i % 2 === 1 ? flip(fillA) : fillA };
+    quads[cwq(startB, -i)] = { kind: kindB, fill: fillB };
     return { divider: true, quadrants: quads };
   };
   const frames = [];
   for (let i = 0; i < SEQ_LEN; i++) frames.push(panelAt(i));
   return {
     type: 'sequence', frames, next: panelAt(SEQ_LEN),
-    rule: level >= 3
-      ? `The ${kindA} moves one step clockwise per panel; the ${kindB} moves two. When they meet, only one shows.`
-      : `The two shapes orbit in opposite directions; when they meet, only one shows.`,
+    rule: altFill
+      ? `The ${kindA} orbits clockwise with its fill alternating; the ${kindB} orbits counter-clockwise.`
+      : `The ${kindA} orbits clockwise; the ${kindB} orbits counter-clockwise.`,
   };
 }
 
@@ -249,7 +252,9 @@ function genPolygonMorph(R, level) {
 
 /* Nesting conveyor: outer shape leaves, inner is promoted, a new shape enters. */
 function genNesting(R, level) {
-  const cycle = R.shuffle(SHAPES).slice(0, 4);
+  // 5-shape cycle: with 4 shapes the answer panel would be an exact copy of
+  // frame 1, letting players pattern-match instead of inferring the conveyor.
+  const cycle = R.shuffle(SHAPES).slice(0, 5);
   const fills = level >= 3 ? ['outline', R.pick(['blue', 'orange', 'green'])] : ['outline', 'outline'];
   const shapeAt = i => cycle[((i % cycle.length) + cycle.length) % cycle.length];
   const panelAt = i => ({
@@ -364,12 +369,23 @@ function genMatrixLatin(R, level) {
   const shapeLatin = level >= 2; // easy: shape constant per row; medium+: shapes Latin too
   const sizeLatin = level >= 4;
   const sizes = [0.65, 0.95, 1.25];
-  const colShift = 1 + R.int(2); // 1 or 2 — valid Latin offsets
+  /* Index squares are (a*r + b*c) % 3 with a,b in {1,2} — always Latin.
+     Pairs split into two classes, {(1,1),(2,2)} and {(1,2),(2,1)}; squares
+     from the SAME class are relabelings of each other. Shape and fill take
+     one pair from each class so they are orthogonal — knowing the shape
+     never tells you the fill. (Order 3 admits only 2 mutually orthogonal
+     squares, so the size square reuses shape's class — a true Latin rule,
+     just not independent of both others.) */
+  const pairA = R.pick([[1, 1], [2, 2]]);
+  const pairB = R.pick([[1, 2], [2, 1]]);
+  const [shapeCoef, fillCoef] = R.chance(0.5) ? [pairA, pairB] : [pairB, pairA];
+  const sizeCoef = [3 - shapeCoef[0], 3 - shapeCoef[1]];
+  const idx = (k, r, c) => (k[0] * r + k[1] * c) % 3;
   const cellAt = (r, c) => ({
     center: {
-      kind: shapeLatin ? shapes[(r + c * colShift) % 3] : shapes[r],
-      fill: fills[(c + r * colShift) % 3],
-      scale: sizeLatin ? sizes[(r + c) % 3] : 1,
+      kind: shapeLatin ? shapes[idx(shapeCoef, r, c)] : shapes[r],
+      fill: fills[idx(fillCoef, r, c)],
+      scale: sizeLatin ? sizes[idx(sizeCoef, r, c)] : 1,
     },
   });
   const { frames, next } = matrixFrames(cellAt);
@@ -383,7 +399,11 @@ function genMatrixLatin(R, level) {
 
 /* Quantitative pairwise progression: dot count climbs across each row. */
 function genMatrixRowCount(R, level) {
-  const rowStart = [1 + R.int(2), 2 + R.int(2), 3 + R.int(2)];
+  // Strictly increasing starts keep all three rows visually distinct
+  // (max count = 2+2+2+2 = 8, exactly filling the border ring).
+  const base = 1 + R.int(2);
+  const d1 = 1 + R.int(2);
+  const rowStart = [base, base + d1, base + d1 + 1 + R.int(2)];
   const color = level >= 3 ? R.pick(['blue', 'green', 'red']) : 'solid';
   const cellAt = (r, c) => {
     const n = rowStart[r] + c;
@@ -402,22 +422,30 @@ function genMatrixRowCount(R, level) {
 function genMatrixOverlay(R, level) {
   const xor = level >= 4;
   const positions = [0, 1, 2, 3, 5, 6, 7, 8]; // 3x3 minus centre
+  const orSet = (a, b) => new Set([...a, ...b]);
+  const andSet = (a, b) => new Set([...a].filter(x => b.has(x)));
+  const xorSet = (a, b) => {
+    const out = new Set();
+    for (const x of a) if (!b.has(x)) out.add(x);
+    for (const x of b) if (!a.has(x)) out.add(x);
+    return out;
+  };
+  /* Each operand pair must overlap (so OR and XOR give different answers)
+     AND each operand must keep dots of its own. Without the second
+     constraint a subset pair degenerates — XOR collapses to a one-dot
+     leftover and OR to a copy of one operand, which reads as nonsense. */
   const rows = [];
   for (let r = 0; r < 3; r++) {
     let a, b;
-    do {
-      a = new Set(R.sample(positions, 2 + R.int(2)));
-      b = new Set(R.sample(positions, 2 + R.int(2)));
-      // ensure OR and XOR differ (some overlap) and result is non-trivial
-    } while (![...a].some(x => b.has(x)) || [...a].every(x => b.has(x)));
+    for (let tries = 0; tries < 60; tries++) {
+      a = new Set(R.sample(positions, 3 + R.int(2)));
+      b = new Set(R.sample(positions, 3 + R.int(2)));
+      const inter = [...a].filter(x => b.has(x)).length;
+      if (inter >= 1 && a.size - inter >= 1 && b.size - inter >= 1) break;
+    }
     rows.push([a, b]);
   }
-  const combine = (a, b) => {
-    const out = new Set();
-    for (const x of a) if (!xor || !b.has(x)) out.add(x);
-    for (const x of b) if (!xor || !a.has(x)) out.add(x);
-    return out;
-  };
+  const combine = xor ? xorSet : orSet;
   const setToPanel = s => {
     const cells = Array(9).fill(null);
     for (const p of s) cells[p] = { kind: 'circle', fill: 'solid', scale: 0.85 };
@@ -425,28 +453,14 @@ function genMatrixOverlay(R, level) {
   };
   const cellAt = (r, c) => setToPanel(c === 0 ? rows[r][0] : c === 1 ? rows[r][1] : combine(rows[r][0], rows[r][1]));
   const { frames, next } = matrixFrames(cellAt);
-  // The classic lure: the OTHER Boolean op on the same operands.
-  const altCombine = (a, b) => {
-    const out = new Set();
-    for (const x of a) if (xor || !b.has(x)) out.add(x); // OR when xor, XOR when or
-    for (const x of b) if (xor || !a.has(x)) out.add(x);
-    if (!xor) { // build XOR
-      const x2 = new Set();
-      for (const x of a) if (!b.has(x)) x2.add(x);
-      for (const x of b) if (!a.has(x)) x2.add(x);
-      return x2;
-    }
-    const or = new Set([...a, ...b]);
-    return or;
-  };
-  const andSet = (a, b) => new Set([...a].filter(x => b.has(x)));
   return {
     type: 'matrix', frames, next,
     rule: xor
       ? 'Third column = the first two combined, but dots appearing in BOTH cancel out (XOR).'
       : 'Third column = all dots from the first two cells combined (union).',
+    // Classic lures: the OTHER Boolean op on the same operands, and AND.
     distractors: [
-      setToPanel(altCombine(rows[2][0], rows[2][1])),
+      setToPanel((xor ? orSet : xorSet)(rows[2][0], rows[2][1])),
       setToPanel(andSet(rows[2][0], rows[2][1])),
     ],
   };
@@ -605,10 +619,21 @@ export function generateProblem(R, difficulty) {
     if (options.some(o => eq(o, d))) continue;
     options.push(d);
   }
-  // Deterministic fallback so we always reach 5 unique options.
+  // Deterministic fallback so we always reach 5 unique options — matched to
+  // the question's panel style so a fallback never stands out as the odd one.
   const fallbacks = [];
-  for (let qd = 0; qd < 4; qd++) fallbacks.push({ divider: true, shaded: [qd] });
-  for (let qd = 0; qd < 4; qd++) fallbacks.push({ divider: true, shaded: [qd, cwq(qd, 1)] });
+  if (q.next.cells && q.next.cells.some(c => c)) {
+    for (let k = 1; k <= 8; k++) {
+      const cells = Array(9).fill(null);
+      for (let j = 0; j < k; j++) cells[FILL9[j]] = { kind: 'circle', fill: 'solid', scale: 0.85 };
+      fallbacks.push(q.next.grid3 ? { grid3: true, cells } : { cells });
+    }
+  } else if (q.next.center) {
+    for (const kind of SHAPES) fallbacks.push({ center: { kind, fill: 'solid' } });
+  } else {
+    for (let qd = 0; qd < 4; qd++) fallbacks.push({ divider: true, shaded: [qd] });
+    for (let qd = 0; qd < 4; qd++) fallbacks.push({ divider: true, shaded: [qd, cwq(qd, 1)] });
+  }
   for (const f of fallbacks) {
     if (options.length >= OPTION_COUNT) break;
     if (!options.some(o => eq(o, f))) options.push(f);

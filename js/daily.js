@@ -6,7 +6,7 @@
    that alters output for a given seed, so an old cached tab and a fresh tab
    never disagree about today's puzzle. */
 
-export const DAILY_GEN_VERSION = 1;
+export const DAILY_GEN_VERSION = 2;
 export const DAILY_LENGTH = 5;
 
 /* Day #1 — launch day of the daily challenge. */
