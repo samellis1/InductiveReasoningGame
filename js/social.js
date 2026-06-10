@@ -3,7 +3,9 @@
    friendly messages. All user-supplied strings are esc()'d before innerHTML. */
 
 import { esc, openModal, closeModal, alertModal, showScreen } from './ui.js';
-import { wasWelcomed, markWelcomed, getPendingJoin, setPendingJoin, clearPendingJoin } from './storage.js';
+import { wasWelcomed, markWelcomed, getPendingJoin, setPendingJoin, clearPendingJoin,
+  getUnpostedScores, markScorePosted } from './storage.js';
+import { todayKey } from './daily.js';
 
 const SUPABASE_URL = 'https://lfbsratbyfgjufjpqfvi.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmYnNyYXRieWZnanVmanBxZnZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODgwMTcsImV4cCI6MjA5NjE2NDAxN30.oM5o7WXKt_1wQEEDpzfdqqk5U6Ocis50VKwqkQ0PbuI';
@@ -118,15 +120,40 @@ export function requireAccount(featureName) {
 
 /* ---------- Score posting ---------- */
 
-export function postScore({ difficulty, avgMs, accuracy }) {
-  if (!currentUser) return;
-  sb.from('scores').insert({
+/* `local` (optional) is a { kind, key } handle to the saved local result, so a
+   successful insert marks it posted and a later backfill won't re-submit it. */
+export function postScore({ difficulty, avgMs, accuracy, local }) {
+  if (!currentUser) return Promise.resolve();
+  return sb.from('scores').insert({
     user_id: currentUser.id,
     display_name: currentUser.name,
     difficulty,
     avg_solve_ms: Math.round(avgMs),
     accuracy,
-  }).then(({ error }) => { if (error) console.error('Leaderboard insert failed:', error.message); });
+  }).then(({ error }) => {
+    if (error) { console.error('Leaderboard insert failed:', error.message); return; }
+    if (local) markScorePosted(local.kind, local.key);
+  });
+}
+
+/* Submit any locally-saved results that never reached the leaderboard — e.g. a
+   round finished while signed out, then the player signs in. Idempotent: each
+   posted result is tagged locally, and an in-flight guard stops the SIGNED_IN
+   and initial-session paths from racing into a double insert. */
+let backfilling = false;
+export async function backfillScores() {
+  if (!currentUser || backfilling) return;
+  backfilling = true;
+  try {
+    for (const p of getUnpostedScores(todayKey())) {
+      await postScore({
+        difficulty: p.difficulty, avgMs: p.avgMs, accuracy: p.accuracy,
+        local: { kind: p.kind, key: p.key },
+      });
+    }
+  } finally {
+    backfilling = false;
+  }
 }
 
 /* ---------- Leaderboard ---------- */
@@ -525,6 +552,7 @@ export function initAuth({ onUserChanged }) {
     if (event === 'SIGNED_IN') {
       maybeWelcome();
       resolvePendingInvite();
+      backfillScores();
     }
     if (onUserChanged) onUserChanged(currentUser);
   });
@@ -532,6 +560,7 @@ export function initAuth({ onUserChanged }) {
   return sb.auth.getSession().then(({ data }) => {
     currentUser = userFromSession(data.session);
     renderAccountBar();
+    if (currentUser) backfillScores(); // recover any prior drops for an already-signed-in player
     return currentUser;
   });
 }

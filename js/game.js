@@ -242,7 +242,8 @@ function finishRound() {
     };
     saveDailyResult(todayKey(), entry);
     clearDailyProgress();
-    postScore({ difficulty: 'daily', avgMs: totalMs / DAILY_LENGTH, accuracy: correct / DAILY_LENGTH });
+    postScore({ difficulty: 'daily', avgMs: totalMs / DAILY_LENGTH, accuracy: correct / DAILY_LENGTH,
+      local: { kind: 'daily', key: todayKey() } });
     game = null;
     renderMenu();
     showDailyResults(entry);
@@ -259,7 +260,8 @@ function finishRound() {
       problems: results.map(r => ({ time: r.timeMs / 1000, correct: r.correct })),
     };
     saveHistoryEntry(entry);
-    postScore({ difficulty: practiceDifficulty, avgMs: totalMs / results.length, accuracy: correct / results.length });
+    postScore({ difficulty: practiceDifficulty, avgMs: totalMs / results.length, accuracy: correct / results.length,
+      local: { kind: 'history', key: entry.date } });
     game = null;
     renderPracticeResults(entry);
     showScreen('results');
