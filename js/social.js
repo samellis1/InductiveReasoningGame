@@ -131,17 +131,81 @@ export function postScore({ difficulty, avgMs, accuracy }) {
 
 /* ---------- Leaderboard ---------- */
 
+/* One tab per difficulty. "Daily" is special: it shows only today's daily-
+   challenge runs, so the board naturally refreshes at each local midnight. */
+const LEADERBOARD_TABS = [
+  { key: 'daily', label: 'Daily' },
+  { key: 'easy', label: 'Easy' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'hard', label: 'Hard' },
+  { key: 'expert', label: 'Expert' },
+];
+
+let activeLeaderboardTab = 'daily';
+
+function cap(s) {
+  s = String(s || '');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/* Local midnight as an ISO timestamp — the cutoff for "today's" daily board.
+   Matches daily.js, where the puzzle rolls over at the player's local midnight. */
+function startOfTodayISO() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
+}
+
 export async function openLeaderboard() {
   if (!requireAccount('the leaderboard')) return;
   showScreen('leaderboard');
+  renderLeaderboardTabs();
+  loadLeaderboardTab(activeLeaderboardTab);
+}
+
+function renderLeaderboardTabs() {
+  const tabs = document.getElementById('leaderboard-tabs');
+  if (!tabs) return;
+  tabs.innerHTML = LEADERBOARD_TABS.map(t => `
+    <button class="lb-tab${t.key === activeLeaderboardTab ? ' active' : ''}" role="tab"
+      aria-selected="${t.key === activeLeaderboardTab}" data-tab="${esc(t.key)}">${esc(t.label)}</button>`).join('');
+  tabs.querySelectorAll('.lb-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.tab;
+      if (key === activeLeaderboardTab) return;
+      activeLeaderboardTab = key;
+      renderLeaderboardTabs();
+      loadLeaderboardTab(key);
+    });
+  });
+}
+
+async function loadLeaderboardTab(diff) {
   const container = document.getElementById('leaderboard-content');
+  const subtitle = document.getElementById('leaderboard-subtitle');
+  if (subtitle) {
+    subtitle.textContent = diff === 'daily'
+      ? "Today's daily challenge — fastest average solve times. Resets at midnight."
+      : `${cap(diff)} difficulty — fastest average solve times across all players. Lower is better.`;
+  }
   container.innerHTML = `<div class="history-empty">Loading…</div>`;
-  const { data, error } = await sb
+
+  let query = sb
     .from('scores')
     .select('user_id, display_name, difficulty, avg_solve_ms, accuracy')
+    .eq('difficulty', diff)
     .order('avg_solve_ms', { ascending: true })
     .limit(500);
-  renderLeaderboard(container, data ? dedupBestPerUser(data) : null, error);
+  if (diff === 'daily') query = query.gte('created_at', startOfTodayISO());
+
+  const { data, error } = await query;
+  // Ignore results for a tab the user has since navigated away from.
+  if (activeLeaderboardTab !== diff) return;
+
+  const emptyMessage = diff === 'daily'
+    ? "No scores yet today — be the first to finish today's daily challenge."
+    : `No ${cap(diff)} scores yet — play a round to be the first on the board.`;
+  renderLeaderboard(container, data ? dedupBestPerUser(data) : null, error,
+    { showDifficulty: false, emptyMessage });
 }
 
 function dedupBestPerUser(rows) {
@@ -149,33 +213,36 @@ function dedupBestPerUser(rows) {
   return rows.filter(r => !seen.has(r.user_id) && seen.add(r.user_id)).slice(0, 50);
 }
 
-function renderLeaderboard(container, rows, error) {
+function renderLeaderboard(container, rows, error, opts = {}) {
+  const showDifficulty = opts.showDifficulty !== false;
+  const emptyMessage = opts.emptyMessage || 'No scores yet — play a round to be the first on the board.';
   if (error) {
     container.innerHTML = `<div class="history-empty">Couldn't load the leaderboard. ${esc(error.message)}</div>`;
     return;
   }
   if (!rows || !rows.length) {
-    container.innerHTML = `<div class="history-empty">No scores yet — play a round to be the first on the board.</div>`;
+    container.innerHTML = `<div class="history-empty">${esc(emptyMessage)}</div>`;
     return;
   }
+  const rowClass = showDifficulty ? '' : ' no-diff';
   const body = rows.map((r, i) => {
-    const diff = esc(String(r.difficulty || '').charAt(0).toUpperCase() + String(r.difficulty || '').slice(1));
     const mine = currentUser && r.user_id === currentUser.id;
+    const diffCell = showDifficulty ? `<div class="num col-problems">${esc(cap(r.difficulty))}</div>` : '';
     return `
-      <div class="history-row${mine ? ' me' : ''}">
+      <div class="history-row${rowClass}${mine ? ' me' : ''}">
         <div class="rank">${i + 1}</div>
         <div class="who-name">${esc(r.display_name)}${mine ? ' <span class="you">you</span>' : ''}</div>
-        <div class="num col-problems">${diff}</div>
+        ${diffCell}
         <div class="num">${Math.round((r.accuracy || 0) * 100)}%</div>
         <div class="avg">${(r.avg_solve_ms / 1000).toFixed(2)}s avg</div>
       </div>`;
   }).join('');
   container.innerHTML = `
     <div class="history-list">
-      <div class="history-row head">
+      <div class="history-row head${rowClass}">
         <div class="rank">#</div>
         <div>Player</div>
-        <div class="col-problems">Difficulty</div>
+        ${showDifficulty ? '<div class="col-problems">Difficulty</div>' : ''}
         <div>Accuracy</div>
         <div>Avg Time</div>
       </div>

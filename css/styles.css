@@ -555,7 +555,29 @@ button.quit:hover { color: var(--text); border-color: var(--accent); }
 /* ----- Leaderboard ----- */
 .leaderboard h2 { font-size: 24px; margin: 0 0 8px 0; }
 #leaderboard-content { margin: 20px 0; }
+.lb-tabs { display: flex; gap: 6px; margin-top: 18px; flex-wrap: wrap; }
+.lb-tab {
+  flex: 1 1 auto;
+  min-width: 64px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-light);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  min-height: 42px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.lb-tab:hover { color: var(--text); border-color: var(--muted); }
+.lb-tab.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
 .leaderboard .history-row { grid-template-columns: 44px 1fr 110px 90px 120px; }
+.leaderboard .history-row.no-diff { grid-template-columns: 44px 1fr 90px 120px; }
 .leaderboard .history-row .rank { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 500; }
 .leaderboard .history-row.me { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .leaderboard .history-row .you {
