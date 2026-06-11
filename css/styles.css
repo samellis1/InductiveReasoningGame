@@ -140,6 +140,7 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
   font-size: 14px;
 }
 .stat span { color: var(--muted); margin-right: 6px; }
+#timer { display: inline-block; min-width: 44px; text-align: right; }
 .progress-bar {
   height: 6px;
   background: var(--panel-light);
@@ -268,14 +269,15 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
 .bld-count { font-variant-numeric: tabular-nums; min-width: 64px; text-align: center; }
 .bld-slot-row { justify-content: center; }
 .bld-hint { font-size: 13px; color: var(--muted); }
-.bld-dotgrid {
-  display: grid; grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 42px);
-  gap: 2px; background: var(--border); padding: 2px; border-radius: 4px;
+/* Tap-the-box dot builder: an invisible 3x3 grid sits over the preview. */
+.bld-dotbox { position: relative; display: inline-block; }
+.bld-dotgrid-overlay {
+  position: absolute; inset: 2px; /* sit inside the canvas border */
+  display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
 }
-.bld-cell { background: #fff; border: none; cursor: pointer; border-radius: 2px; position: relative; }
-.bld-cell.on::after { content: ''; position: absolute; inset: 0; margin: auto; width: 14px; height: 14px; border-radius: 50%; background: #111; }
-.bld-cell.disabled { background: var(--panel-light); cursor: default; }
-.bld-cell:hover:not(.disabled):not(.on) { background: #eee; }
+.bld-cellhit { background: transparent; border: none; cursor: pointer; padding: 0; }
+.bld-cellhit:hover:not(.disabled) { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.bld-cellhit.disabled { cursor: default; }
 .bld-submit { margin-top: 22px; }
 
 /* Number pad builder */
@@ -325,9 +327,17 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
 .bld-nested-overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
 .bld-sect { fill: transparent; stroke: none; cursor: pointer; }
 .bld-sect:hover { fill: color-mix(in srgb, var(--accent) 18%, transparent); }
+.bld-sect.drop { fill: color-mix(in srgb, var(--accent) 32%, transparent); }
 .bld-sect:focus-visible { stroke: var(--accent); stroke-width: 2; outline: none; }
 .bld-legend { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; align-items: center; }
-.bld-legend-chip { display: inline-flex; border-radius: 4px; overflow: hidden; }
+.bld-legend-chip {
+  display: inline-flex; padding: 3px; border: 2px solid transparent; border-radius: 6px;
+  background: #fff; cursor: grab; line-height: 0;
+}
+.bld-legend-chip:active { cursor: grabbing; }
+.bld-legend-chip:hover { border-color: var(--muted); }
+.bld-legend-chip.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.bld-legend-chip svg { border-radius: 3px; }
 
 /* ----- Per-family identity -----
    Each puzzle family gets its own accent + frame treatment so types look,

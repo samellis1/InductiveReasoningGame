@@ -272,7 +272,7 @@ function genNestedShape(R, level, shape) {
   return {
     type: 'sequence', frames, next: frameAt(SEQ_LEN),
     rule,
-    instruction: 'Watch the outer and inner sections separately — each follows its own pattern. Tap a section to cycle its fill.',
+    instruction: 'Watch the outer and inner sections separately — each follows its own pattern. Drag a fill onto each section.',
     answerSpec: { kind: 'nested', shape, n, states },
   };
 }

@@ -180,7 +180,7 @@ function loadQuestion() {
       .map(p => `<div class="tile">${renderPanel(p, 120)}</div>`)
       .join('<div class="arrow" aria-hidden="true">→</div>')
       + `<div class="arrow" aria-hidden="true">→</div><div class="tile question">?</div>`;
-    if (fam === 'nested') answerLabel = 'Fill in the next figure — tap sections to cycle';
+    if (fam === 'nested') answerLabel = 'Fill in the next figure — drag a fill into each section';
   }
 
   const instr = document.getElementById('instruction');

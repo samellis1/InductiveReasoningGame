@@ -103,10 +103,11 @@ function initialState(spec) {
 
 function centerShell(spec) {
   const nested = spec.kind === 'centerNested';
-  const sizeRow = spec.sizes ? `
+  const sortedSizes = spec.sizes ? spec.sizes.slice().sort((a, b) => a - b) : null;
+  const sizeRow = sortedSizes ? `
     <div class="bld-controls">
       <span class="bld-ctl-label">Size</span>
-      ${spec.sizes.map((s, i) => `<button type="button" class="bld-size" data-size="${s}" title="Size ${i + 1}"><span style="font-size:${9 + i * 4}px;line-height:1">●</span></button>`).join('')}
+      ${sortedSizes.map((s, i) => `<button type="button" class="bld-size" data-size="${s}" title="Size ${i + 1}"><span style="font-size:${9 + i * 4}px;line-height:1">●</span></button>`).join('')}
     </div>` : '';
   const slotRow = nested ? `
     <div class="bld-controls">
@@ -133,41 +134,46 @@ function centerShell(spec) {
 }
 
 function dotsShell(spec) {
+  // The canvas itself is the tap target: an invisible 3x3 grid is laid over the
+  // preview in wire(), so players add/remove dots by tapping inside the box.
   if (spec.dotMode === 'count') {
     return `
       <div class="bld-stage bld-stage-center">
         <div class="bld-canvas-wrap">
-          <div class="bld-canvas"></div>
+          <div class="bld-dotbox"><div class="bld-canvas"></div></div>
           <div class="bld-controls">
             <button type="button" class="bld-step" data-step="-1" aria-label="Remove a dot">−</button>
             <span class="bld-count" aria-live="polite">0 dots</span>
             <button type="button" class="bld-step" data-step="1" aria-label="Add a dot">+</button>
           </div>
+          <div class="bld-hint">Tap inside the box to add or remove a dot.</div>
         </div>
       </div>`;
   }
   return `
     <div class="bld-stage bld-stage-center">
       <div class="bld-canvas-wrap">
-        <div class="bld-canvas"></div>
-        <div class="bld-hint">Tap the cells to place dots.</div>
+        <div class="bld-dotbox"><div class="bld-canvas"></div></div>
+        <div class="bld-hint">Tap inside the box to add or remove a dot.</div>
       </div>
     </div>`;
 }
 
-/* Tap-to-cycle: each section of the preview is a click target that steps
-   through blank → state1 → state2 → … → blank. A passive legend shows the
-   cycle order so players know what's coming. */
+/* Drag-and-drop (with a tap fallback): the palette below holds one draggable
+   swatch per fill. Drag a swatch onto a section, or tap a swatch to pick it up
+   then tap a section to drop it. Tapping a section with no swatch picked clears
+   it. */
 function nestedShell(spec) {
-  const legend = spec.states.map(s => `<span class="bld-legend-chip">${textureSwatchSvg(s.texture || null, s.color || null, 24)}</span>`).join('');
+  const legend = spec.states.map((s, k) =>
+    `<button type="button" class="bld-legend-chip" data-state="${k}" draggable="true" aria-label="Fill ${k + 1}">${textureSwatchSvg(s.texture || null, s.color || null, 24)}</button>`).join('');
   return `
     <div class="bld-stage bld-stage-center">
       <div class="bld-canvas-wrap">
         <div class="bld-nested-wrap">
           <div class="bld-canvas"></div>
         </div>
-        <div class="bld-hint">Tap any section to cycle its fill.</div>
-        <div class="bld-legend" aria-label="Available fills">${legend}</div>
+        <div class="bld-hint">Drag a fill into a section — or tap a fill, then a section. Tap a filled section to clear it.</div>
+        <div class="bld-legend" aria-label="Available fills — drag onto a section">${legend}</div>
         <button type="button" class="bld-clear" data-clear="1">Clear all</button>
       </div>
     </div>`;
@@ -279,25 +285,36 @@ function wire(root, spec, st, repaint, setSel) {
   }
 
   if (spec.kind === 'dots') {
+    // An invisible 3x3 grid laid over the preview turns "tap inside the box"
+    // into add/remove. Cells outside the puzzle's usable positions are inert.
+    const box = root.querySelector('.bld-dotbox');
+    const overlay = document.createElement('div');
+    overlay.className = 'bld-dotgrid-overlay';
+    const usable = p => (spec.dotMode === 'cells' ? spec.cellPositions.includes(p) : spec.order.includes(p));
+    overlay.innerHTML = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+      .map(p => `<button type="button" class="bld-cellhit${usable(p) ? '' : ' disabled'}" data-cell="${p}" ${usable(p) ? '' : 'disabled'} aria-label="Cell ${p + 1}"></button>`)
+      .join('');
+    box.appendChild(overlay);
+
+    overlay.querySelectorAll('[data-cell]:not([disabled])').forEach(b => b.addEventListener('click', () => {
+      const p = parseInt(b.dataset.cell, 10);
+      if (spec.dotMode === 'count') {
+        // Dots fill in a fixed order; tapping sets how far the fill reaches.
+        // Tap an empty cell → fill through it; tap a filled cell → stop before it.
+        const idx = spec.order.indexOf(p);
+        st.count = idx < st.count ? idx : Math.min(spec.maxCount, idx + 1);
+      } else if (st.cells.has(p)) {
+        st.cells.delete(p);
+      } else {
+        st.cells.add(p);
+      }
+      repaint();
+    }));
+
     if (spec.dotMode === 'count') {
       root.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
         const next = st.count + parseInt(b.dataset.step, 10);
         st.count = Math.max(0, Math.min(spec.maxCount, next));
-        repaint();
-      }));
-    } else {
-      const canvas = root.querySelector('.bld-canvas');
-      // Overlay a clickable 3x3 grid aligned to the preview.
-      const grid = document.createElement('div');
-      grid.className = 'bld-dotgrid';
-      grid.innerHTML = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-        .map(p => `<button type="button" class="bld-cell${spec.cellPositions.includes(p) ? '' : ' disabled'}" data-cell="${p}" ${spec.cellPositions.includes(p) ? '' : 'disabled'}></button>`)
-        .join('');
-      canvas.parentElement.insertBefore(grid, canvas.nextSibling);
-      grid.querySelectorAll('[data-cell]').forEach(b => b.addEventListener('click', () => {
-        const p = parseInt(b.dataset.cell, 10);
-        if (st.cells.has(p)) st.cells.delete(p); else st.cells.add(p);
-        b.classList.toggle('on', st.cells.has(p));
         repaint();
       }));
     }
@@ -346,19 +363,39 @@ function wire(root, spec, st, repaint, setSel) {
       .join('');
     wrap.appendChild(overlay);
 
-    const cycle = (group, i) => {
-      // -1 (blank) → 0 → 1 → … → states.length-1 → -1
-      st[group][i] = st[group][i] + 1 >= spec.states.length ? -1 : st[group][i] + 1;
-      repaint();
-    };
+    // The "brush": a fill picked up from the palette, applied on tap or drop.
+    // -1 means no brush, so a section tap clears it instead.
+    let brush = -1;
+    const swatches = root.querySelectorAll('.bld-legend-chip[data-state]');
+    const reflectBrush = () => swatches.forEach(s => s.classList.toggle('sel', parseInt(s.dataset.state, 10) === brush));
+    swatches.forEach(s => {
+      const k = parseInt(s.dataset.state, 10);
+      s.addEventListener('click', () => { brush = brush === k ? -1 : k; reflectBrush(); });
+      s.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', String(k));
+        e.dataTransfer.effectAllowed = 'copy';
+      });
+    });
+
+    const apply = (group, i, val) => { st[group][i] = val; repaint(); };
     overlay.querySelectorAll('.bld-sect').forEach(p => {
-      const go = () => cycle(p.dataset.group, parseInt(p.dataset.i, 10));
-      p.addEventListener('click', go);
-      p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+      const group = p.dataset.group, i = parseInt(p.dataset.i, 10);
+      p.addEventListener('click', () => apply(group, i, brush));
+      p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apply(group, i, brush); } });
+      p.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; p.classList.add('drop'); });
+      p.addEventListener('dragleave', () => p.classList.remove('drop'));
+      p.addEventListener('drop', e => {
+        e.preventDefault();
+        p.classList.remove('drop');
+        const k = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        if (!Number.isNaN(k)) apply(group, i, k);
+      });
     });
     root.querySelector('[data-clear]').addEventListener('click', () => {
       st.outer.fill(-1);
       st.inner.fill(-1);
+      brush = -1;
+      reflectBrush();
       repaint();
     });
   }
