@@ -44,7 +44,7 @@ alter table public.scores
 alter table public.scores drop constraint if exists scores_difficulty_allowed;
 alter table public.scores
   add constraint scores_difficulty_allowed
-  check (difficulty in ('easy', 'medium', 'hard', 'expert', 'daily')) not valid;
+  check (difficulty in ('easy', 'medium', 'hard', 'daily')) not valid;
 
 -- display_name is also client-supplied; cap it so nobody injects a novel.
 alter table public.scores drop constraint if exists scores_display_name_length;
@@ -141,14 +141,14 @@ commit;
 -- select * from public.scores
 -- where avg_solve_ms not between 500 and 600000
 --    or accuracy not between 0 and 1
---    or difficulty not in ('easy', 'medium', 'hard', 'expert', 'daily')
+--    or difficulty not in ('easy', 'medium', 'hard', 'daily')
 --    or display_name is null
 --    or char_length(display_name) not between 1 and 80;
 --
 -- delete from public.scores
 -- where avg_solve_ms not between 500 and 600000
 --    or accuracy not between 0 and 1
---    or difficulty not in ('easy', 'medium', 'hard', 'expert', 'daily')
+--    or difficulty not in ('easy', 'medium', 'hard', 'daily')
 --    or display_name is null
 --    or char_length(display_name) not between 1 and 80;
 -- ----------------------------------------------------------------------------

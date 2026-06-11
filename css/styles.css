@@ -223,6 +223,61 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
 .option.correct .tile { border-color: var(--correct); box-shadow: 0 0 0 3px var(--correct); }
 .option.wrong   .tile { border-color: var(--wrong);   box-shadow: 0 0 0 3px var(--wrong); }
 .option:disabled { cursor: default; }
+
+/* ----- Answer builder (construct-the-answer) ----- */
+.builder { margin-top: 8px; }
+.bld-stage { display: flex; gap: 16px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+.bld-stage-center { justify-content: center; }
+.bld-canvas-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.bld-canvas {
+  width: 150px; height: 150px; background: #fff;
+  border: 2px solid #000; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.bld-palette {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--panel-light); min-width: 92px;
+}
+.bld-palette-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 2px; text-align: center; }
+.bld-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 4px; border: 2px solid transparent; border-radius: 8px;
+  background: #fff; cursor: pointer; min-height: 42px; min-width: 42px;
+}
+.bld-chip.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.bld-chip:hover { border-color: var(--muted); }
+.bld-chip svg { display: block; }
+.bld-blank { font-size: 12px; color: var(--muted); background: var(--panel-light); }
+.bld-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.bld-ctl-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.bld-slot, .bld-size, .bld-step, .bld-clear {
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel-light); color: var(--text); cursor: pointer; min-height: 40px;
+}
+.bld-slot.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
+.bld-size.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.bld-step { font-size: 20px; min-width: 44px; line-height: 1; }
+.bld-count { font-variant-numeric: tabular-nums; min-width: 64px; text-align: center; }
+.bld-slot-row { justify-content: center; }
+.bld-hint { font-size: 13px; color: var(--muted); }
+.bld-dotgrid {
+  display: grid; grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 42px);
+  gap: 2px; background: var(--border); padding: 2px; border-radius: 4px;
+}
+.bld-cell { background: #fff; border: none; cursor: pointer; border-radius: 2px; position: relative; }
+.bld-cell.on::after { content: ''; position: absolute; inset: 0; margin: auto; width: 14px; height: 14px; border-radius: 50%; background: #111; }
+.bld-cell.disabled { background: var(--panel-light); cursor: default; }
+.bld-cell:hover:not(.disabled):not(.on) { background: #eee; }
+.bld-submit { margin-top: 22px; }
+
+/* Answer reveal after submitting */
+.reveal { display: flex; gap: 24px; justify-content: center; align-items: flex-end; flex-wrap: wrap; }
+.reveal-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.reveal-label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.tile.correct { border-color: var(--correct); box-shadow: 0 0 0 3px var(--correct); }
+.tile.wrong { border-color: var(--wrong); box-shadow: 0 0 0 3px var(--wrong); }
+
 .feedback {
   margin-top: 24px;
   min-height: 32px;

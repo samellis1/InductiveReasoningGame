@@ -2,8 +2,9 @@
    stats, history — local-first; account features layer on top. */
 
 import { makeRng, rngHelpers } from './rng.js';
-import { renderPanel } from './panels.js';
-import { generateProblem, DIFFICULTIES } from './generators.js';
+import { renderPanel, panelEq } from './panels.js';
+import { generateProblem, generateNestedSquares } from './generators.js';
+import { renderBuilder } from './builder.js';
 import {
   DAILY_GEN_VERSION, DAILY_LENGTH, todayKey, dailyNumber, dailySeed,
   dailyRamp, msUntilTomorrow, formatCountdown, shareText,
@@ -28,7 +29,8 @@ let countdownTimer = null;
 
 const ui = {
   sequence: document.getElementById('sequence'),
-  options: document.getElementById('options'),
+  builder: document.getElementById('answer-builder'),
+  answerLabel: document.getElementById('answer-label'),
   msg: document.getElementById('msg'),
   rule: document.getElementById('rule-note'),
   next: document.getElementById('next'),
@@ -63,7 +65,9 @@ function clearDailyProgress() {
 
 function dailyQuestions() {
   const R = rngHelpers(makeRng(dailySeed()));
-  return dailyRamp().map(diff => generateProblem(R, diff));
+  const qs = dailyRamp().map(diff => generateProblem(R, diff));
+  qs.push(generateNestedSquares(R)); // Hard finale — the nested-squares puzzle
+  return qs;
 }
 
 function startDaily() {
@@ -143,16 +147,10 @@ function loadQuestion() {
       + `<div class="arrow" aria-hidden="true">→</div><div class="tile question">?</div>`;
   }
 
-  const letters = ['A', 'B', 'C', 'D', 'E'];
-  ui.options.innerHTML = q.options
-    .map((p, i) => `
-      <button class="option" data-idx="${i}" aria-label="Answer ${letters[i]}">
-        <div class="tile">${renderPanel(p, 110)}</div>
-        <div class="letter">${letters[i]}</div>
-      </button>`).join('');
-  ui.options.querySelectorAll('.option').forEach(el => {
-    el.addEventListener('click', () => handleAnswer(parseInt(el.dataset.idx, 10), el));
-  });
+  ui.answerLabel.textContent = q.type === 'matrix'
+    ? 'Build the figure for the empty cell'
+    : 'Build the figure that comes next';
+  renderBuilder(ui.builder, q.answerSpec, built => handleSubmit(built));
 
   startTimer();
 }
@@ -187,23 +185,31 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-function handleAnswer(idx, el) {
+function handleSubmit(built) {
   if (!game || game.answered) return;
   game.answered = true;
   const elapsed = stopTimer();
   const q = currentQuestion();
-  const correct = idx === q.answerIndex;
+  const correct = panelEq(built, q.next);
   game.results.push({ correct, timeMs: Math.round(elapsed) });
 
-  ui.options.querySelectorAll('.option').forEach(o => { o.disabled = true; });
-  el.classList.add(correct ? 'correct' : 'wrong');
-  if (!correct) {
-    const right = ui.options.querySelector(`[data-idx="${q.answerIndex}"]`);
-    if (right) right.classList.add('correct');
-  }
+  // Reveal what they built; when wrong, show the correct answer beside it.
+  ui.builder.innerHTML = `
+    <div class="reveal">
+      <div class="reveal-item">
+        <div class="reveal-label">Your answer</div>
+        <div class="tile ${correct ? 'correct' : 'wrong'}">${renderPanel(built, 120)}</div>
+      </div>
+      ${correct ? '' : `
+      <div class="reveal-item">
+        <div class="reveal-label">Correct answer</div>
+        <div class="tile correct">${renderPanel(q.next, 120)}</div>
+      </div>`}
+    </div>`;
+
   ui.msg.textContent = correct
     ? `Correct! ${(elapsed / 1000).toFixed(1)}s`
-    : `Not quite — the answer is highlighted.`;
+    : `Not quite — the correct answer is shown.`;
   ui.msg.className = 'msg ' + (correct ? 'correct' : 'wrong');
   ui.rule.innerHTML = `<b>The rule:</b> ${esc(q.rule)}`;
   ui.rule.hidden = false;
@@ -481,12 +487,12 @@ function howToPlay(fromBoot) {
   ];
   openModal(`
     <h3>How to play</h3>
-    <p class="howto-note">Each puzzle hides a rule. Spot it, then pick the figure that comes next (or completes the grid).</p>
+    <p class="howto-note">Each puzzle hides a rule. Spot it, then <b>build</b> the figure that comes next — tap a shape, a fill or color, and a size from the palettes, then submit.</p>
     <div class="howto-example">
       ${example.map(p => `<div class="tile">${renderPanel(p, 64)}</div>`).join('')}
       <div class="tile question" style="width:64px;height:64px;font-size:24px;">?</div>
     </div>
-    <p class="howto-note">Here the fill alternates — so the answer is a <b>solid circle</b>. One new challenge every day; keep your streak alive and share your grid.</p>
+    <p class="howto-note">Here the fill alternates — so you'd build a <b>solid circle</b>. One new challenge every day; keep your streak alive and share your grid.</p>
     <div class="modal-actions">
       <button class="primary" id="modal-howto-play">${fromBoot ? "Play today's challenge" : 'Got it'}</button>
     </div>`);
@@ -555,14 +561,7 @@ for (const id of ['btn-history-back', 'btn-leaderboard-back', 'btn-groups-back',
 
 document.addEventListener('keydown', e => {
   if (activeScreen() !== 'round') return;
-  if (e.key === 'Enter' && !ui.next.hidden) { nextOrFinish(); return; }
-  if (!game || game.answered) return;
-  const map = { a: 0, b: 1, c: 2, d: 3, e: 4, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4 };
-  const key = e.key.toLowerCase();
-  if (key in map) {
-    const el = ui.options.querySelector(`[data-idx="${map[key]}"]`);
-    if (el) handleAnswer(map[key], el);
-  }
+  if (e.key === 'Enter' && !ui.next.hidden) { nextOrFinish(); }
 });
 
 document.getElementById('btn-invite-google').innerHTML = googleButtonHtml('Sign in with Google to join');

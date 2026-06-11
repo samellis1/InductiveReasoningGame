@@ -62,7 +62,17 @@ function canonicalToken(t) {
   }
   if (t.count) out.count = t.count;
   if (t.scale && t.scale !== 1) out.scale = Math.round(t.scale * 100) / 100;
+  if (t.texture) out.texture = t.texture;
   if (t.inner) out.inner = canonicalToken(t.inner);
+  return out;
+}
+
+/* A nested section is blank unless it has a color or texture. */
+function canonicalSection(sec) {
+  if (!sec || (!sec.color && !sec.texture)) return null;
+  const out = {};
+  if (sec.color) out.color = sec.color;
+  if (sec.texture) out.texture = sec.texture;
   return out;
 }
 
@@ -74,11 +84,70 @@ export function canonicalPanel(p) {
   if (p.quadrants && p.quadrants.some(q => q)) out.quadrants = p.quadrants.map(canonicalToken);
   if (p.center) out.center = canonicalToken(p.center);
   if (p.cells && p.cells.some(c => c)) out.cells = p.cells.map(canonicalToken);
+  if (p.nested) out.nested = {
+    outer: p.nested.outer.map(canonicalSection),
+    inner: p.nested.inner.map(canonicalSection),
+  };
   return out;
 }
 
 export function panelEq(a, b) {
   return JSON.stringify(canonicalPanel(a)) === JSON.stringify(canonicalPanel(b));
+}
+
+/* Section textures for the nested-squares puzzle. A section is a solid color
+   and/or one of these textures, or blank. */
+export const TEXTURES = ['stripes', 'dots', 'crosshatch', 'checker'];
+
+/* Pattern element ids must be unique per inline <svg> — duplicate ids across
+   inline SVGs make url(#id) resolve to the wrong (first) pattern in document
+   order. Every renderPanel call salts its ids with a fresh prefix. */
+let _patternUid = 0;
+
+function texturePattern(id, texture, color) {
+  const base = color ? (COLORS[color] || color) : 'white';
+  const ink = '#111';
+  if (texture === 'stripes') {
+    return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="8" height="8">`
+      + `<rect width="8" height="8" fill="${base}"/>`
+      + `<path d="M-2,2 L2,-2 M0,8 L8,0 M6,10 L10,6" stroke="${ink}" stroke-width="1.5"/></pattern>`;
+  }
+  if (texture === 'dots') {
+    return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="8" height="8">`
+      + `<rect width="8" height="8" fill="${base}"/>`
+      + `<circle cx="4" cy="4" r="1.6" fill="${ink}"/></pattern>`;
+  }
+  if (texture === 'crosshatch') {
+    return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="8" height="8">`
+      + `<rect width="8" height="8" fill="${base}"/>`
+      + `<path d="M0,0 L0,8 M0,0 L8,0" stroke="${ink}" stroke-width="1"/></pattern>`;
+  }
+  // checker
+  return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="10" height="10">`
+    + `<rect width="10" height="10" fill="${base}"/>`
+    + `<rect width="5" height="5" fill="${ink}"/><rect x="5" y="5" width="5" height="5" fill="${ink}"/></pattern>`;
+}
+
+/* A standalone swatch for builder palettes: a square filled with a color, a
+   texture, or a textured color. Used for the color/texture picker buttons. */
+export function textureSwatchSvg(texture, color, size = 30) {
+  const id = 'sw' + (_patternUid++);
+  const def = texture ? texturePattern(id, texture, color) : '';
+  const fill = texture ? `url(#${id})` : (color ? (COLORS[color] || color) : 'white');
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">`
+    + `${def ? `<defs>${def}</defs>` : ''}`
+    + `<rect x="1" y="1" width="${size - 2}" height="${size - 2}" fill="${fill}" stroke="#111" stroke-width="1"/></svg>`;
+}
+
+/* One nested section ({color, texture} | null) → { fill, def }. The def (if any)
+   is an SVG <pattern> the caller must place in the panel's <defs>. */
+function sectionFill(section, idPrefix, tag) {
+  if (!section || (!section.color && !section.texture)) return { fill: 'white', def: '' };
+  if (!section.texture) {
+    return { fill: COLORS[section.color] || section.color, def: '' };
+  }
+  const id = `${idPrefix}${tag}`;
+  return { fill: `url(#${id})`, def: texturePattern(id, section.texture, section.color) };
 }
 
 function fillAttr(fill, invert) {
@@ -188,6 +257,8 @@ export function renderPanel(panel, size = 120) {
              `<line x1="0" y1="${t2}" x2="${s}" y2="${t2}" stroke="#bbb" stroke-width="1"/>`;
   }
 
+  const pid = 'pat' + (_patternUid++) + '_';
+  let defs = '';
   let content = '';
   if (panel.quadrants) {
     for (let i = 0; i < 4; i++) {
@@ -209,6 +280,27 @@ export function renderPanel(panel, size = 120) {
     }
   }
   if (panel.center) content += tokenSvg(panel.center, half, half, 38);
+  if (panel.nested) {
+    // Outer square split into 4 quadrants (TL, TR, BR, BL), then a smaller
+    // inner square (~52%) drawn on top, also split into 4.
+    const drawQuads = (sections, ox, oy, sq, tag) => {
+      const hw = sq / 2;
+      const rects = [[ox, oy], [ox + hw, oy], [ox + hw, oy + hw], [ox, oy + hw]];
+      let out = '';
+      for (let i = 0; i < 4; i++) {
+        const { fill, def } = sectionFill((sections || [])[i], pid, tag + i);
+        if (def) defs += def;
+        const [x, y] = rects[i];
+        out += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${hw.toFixed(2)}" height="${hw.toFixed(2)}" fill="${fill}" stroke="#111" stroke-width="1"/>`;
+      }
+      return out;
+    };
+    content += drawQuads(panel.nested.outer, 0, 0, s, 'o');
+    const innerSize = s * 0.52;
+    const io = (s - innerSize) / 2;
+    content += drawQuads(panel.nested.inner, io, io, innerSize, 'i');
+    content += `<rect x="${io.toFixed(2)}" y="${io.toFixed(2)}" width="${innerSize.toFixed(2)}" height="${innerSize.toFixed(2)}" fill="none" stroke="#111" stroke-width="2"/>`;
+  }
 
-  return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" role="img" aria-hidden="true">${bg}${lines}${content}</svg>`;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" role="img" aria-hidden="true">${defs ? `<defs>${defs}</defs>` : ''}${bg}${lines}${content}</svg>`;
 }

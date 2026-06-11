@@ -6,7 +6,7 @@
    that alters output for a given seed, so an old cached tab and a fresh tab
    never disagree about today's puzzle. */
 
-export const DAILY_GEN_VERSION = 2;
+export const DAILY_GEN_VERSION = 3;
 export const DAILY_LENGTH = 5;
 
 /* Day #1 — launch day of the daily challenge. */
@@ -30,9 +30,10 @@ export function dailySeed(dayKey = todayKey()) {
   return `irt-daily-v${DAILY_GEN_VERSION}-${dayKey}`;
 }
 
-/* Difficulty ramp within one daily — everyone meets the expert question last. */
+/* Difficulty ramp for the first four daily puzzles — the fifth is always the
+   nested-squares finale (added in game.js's dailyQuestions). */
 export function dailyRamp() {
-  return ['easy', 'medium', 'medium', 'hard', 'expert'];
+  return ['easy', 'easy', 'medium', 'hard'];
 }
 
 /* ms until local midnight, for the "next puzzle in…" countdown. */

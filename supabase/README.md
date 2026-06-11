@@ -11,7 +11,7 @@ Without it, anyone with the anon key can insert a fake 1ms score under any
 `user_id`. The migration adds:
 
 - **CHECK constraints** — `avg_solve_ms` must be 500–600000 ms, `accuracy`
-  0–1, `difficulty` one of `easy/medium/hard/expert/daily`, `display_name`
+  0–1, `difficulty` one of `easy/medium/hard/daily`, `display_name`
   1–80 chars. Added `NOT VALID` so existing bad rows don't block the
   migration; new inserts are checked immediately.
 - **RLS policies** — all existing policies on `scores` are dropped and

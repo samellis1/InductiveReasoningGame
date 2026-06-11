@@ -165,7 +165,6 @@ const LEADERBOARD_TABS = [
   { key: 'easy', label: 'Easy' },
   { key: 'medium', label: 'Medium' },
   { key: 'hard', label: 'Hard' },
-  { key: 'expert', label: 'Expert' },
 ];
 
 let activeLeaderboardTab = 'daily';
