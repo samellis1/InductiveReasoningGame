@@ -511,6 +511,7 @@ function renderPracticeResults(entry) {
 
 function openStats() {
   stopCountdown();
+  document.getElementById('stats-signin-note').style.display = currentUser ? 'none' : '';
   const streaks = computeStreaks(todayKey());
   const daily = loadDaily().results;
   const days = Object.values(daily);
