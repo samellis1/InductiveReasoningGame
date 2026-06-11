@@ -14,40 +14,30 @@
      nested        { colors, textures }                      the nested-squares puzzle
 */
 
-import { renderPanel, textureSwatchSvg } from './panels.js';
+import { renderPanel, textureSwatchSvg, nestedSectionPaths } from './panels.js';
 
 const SHAPE_LABEL = {
   triangle: 'Triangle', square: 'Square', circle: 'Circle', pentagon: 'Pentagon',
   hexagon: 'Hexagon', diamond: 'Diamond', star: 'Star', cross: 'Cross',
 };
-const TEXTURE_LABEL = { stripes: 'Stripes', dots: 'Dots', crosshatch: 'Hatch', checker: 'Checker' };
-const QUAD_LABEL = ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left'];
-
 const PREVIEW_SIZE = 150;
 
 /* ---------- shared bits ---------- */
 
 function shapeBtn(kind, selected) {
-  return `<button type="button" class="bld-chip${selected ? ' sel' : ''}" data-shape="${kind}" title="${SHAPE_LABEL[kind] || kind}">
-    ${renderPanel({ center: { kind, fill: 'outline' } }, 34)}</button>`;
+  const label = SHAPE_LABEL[kind] || kind;
+  return `<button type="button" class="bld-chip${selected ? ' sel' : ''}" data-shape="${kind}" title="${label}">
+    ${renderPanel({ center: { kind, fill: 'outline' } }, 44)}<span class="bld-chip-label">${label}</span></button>`;
 }
 
 function fillBtn(fill, selected) {
   const swatch = fill === 'outline'
-    ? textureSwatchSvg(null, null, 28)
+    ? textureSwatchSvg(null, null, 34)
     : fill === 'solid'
-      ? `<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" fill="#111"/></svg>`
-      : textureSwatchSvg(null, fill, 28);
+      ? `<svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" fill="#111"/></svg>`
+      : textureSwatchSvg(null, fill, 34);
   const label = fill === 'outline' ? 'Outline' : fill === 'solid' ? 'Solid' : fill;
-  return `<button type="button" class="bld-chip${selected ? ' sel' : ''}" data-fill="${fill}" title="${label}">${swatch}</button>`;
-}
-
-function colorBtn(color, selected) {
-  return `<button type="button" class="bld-chip${selected ? ' sel' : ''}" data-color="${color}" title="${color}">${textureSwatchSvg(null, color, 28)}</button>`;
-}
-
-function textureBtn(texture, selected) {
-  return `<button type="button" class="bld-chip${selected ? ' sel' : ''}" data-texture="${texture}" title="${TEXTURE_LABEL[texture] || texture}">${textureSwatchSvg(texture, null, 28)}</button>`;
+  return `<button type="button" class="bld-chip${selected ? ' sel' : ''}" data-fill="${fill}" title="${label}">${swatch}<span class="bld-chip-label">${label}</span></button>`;
 }
 
 /* ---------- panel assembly from builder state ---------- */
@@ -72,17 +62,18 @@ function toPanel(spec, st) {
     return spec.grid3 ? { grid3: true, cells } : { cells };
   }
   if (spec.kind === 'nested') {
-    return { nested: { outer: st.outer.map(cloneSec), inner: st.inner.map(cloneSec) } };
+    // st.outer/st.inner hold cycle indices: -1 = blank, k = spec.states[k].
+    const toSections = idxs => idxs.map(k => (k < 0 ? null : { ...spec.states[k] }));
+    return { nested: { shape: spec.shape, outer: toSections(st.outer), inner: toSections(st.inner) } };
+  }
+  if (spec.kind === 'number') return { text: st.value };
+  if (spec.kind === 'week') return { week: { days: st.days.map(on => (on ? 'mark' : null)) } };
+  if (spec.kind === 'pickday') {
+    const days = Array(7).fill(null);
+    if (st.day >= 0) days[st.day] = 'mark';
+    return { week: { days } };
   }
   return {};
-}
-
-function cloneSec(s) {
-  if (!s || (!s.color && !s.texture)) return null;
-  const o = {};
-  if (s.color) o.color = s.color;
-  if (s.texture) o.texture = s.texture;
-  return o;
 }
 
 function initialState(spec) {
@@ -98,11 +89,13 @@ function initialState(spec) {
   }
   if (spec.kind === 'nested') {
     return {
-      slot: { group: 'outer', i: 0 },
-      outer: [null, null, null, null],
-      inner: [null, null, null, null],
+      outer: Array(spec.n).fill(-1),
+      inner: Array(spec.n).fill(-1),
     };
   }
+  if (spec.kind === 'number') return { value: '' };
+  if (spec.kind === 'week') return { days: Array(7).fill(false) };
+  if (spec.kind === 'pickday') return { day: -1 };
   return {};
 }
 
@@ -162,26 +155,48 @@ function dotsShell(spec) {
     </div>`;
 }
 
+/* Tap-to-cycle: each section of the preview is a click target that steps
+   through blank → state1 → state2 → … → blank. A passive legend shows the
+   cycle order so players know what's coming. */
 function nestedShell(spec) {
-  const slotBtns = group => [0, 1, 2, 3].map(i =>
-    `<button type="button" class="bld-slot${group === 'outer' && i === 0 ? ' sel' : ''}" data-group="${group}" data-i="${i}">${QUAD_LABEL[i]}</button>`).join('');
+  const legend = spec.states.map(s => `<span class="bld-legend-chip">${textureSwatchSvg(s.texture || null, s.color || null, 24)}</span>`).join('');
   return `
-    <div class="bld-stage">
-      <div class="bld-palette bld-colors">
-        <div class="bld-palette-title">Color</div>
-        ${spec.colors.map(c => colorBtn(c, false)).join('')}
-        <button type="button" class="bld-chip bld-blank" data-color="">None</button>
-      </div>
+    <div class="bld-stage bld-stage-center">
       <div class="bld-canvas-wrap">
-        <div class="bld-canvas"></div>
-        <div class="bld-controls bld-slot-row"><span class="bld-ctl-label">Outer</span>${slotBtns('outer')}</div>
-        <div class="bld-controls bld-slot-row"><span class="bld-ctl-label">Inner</span>${slotBtns('inner')}</div>
-        <button type="button" class="bld-clear" data-clear="1">Clear section</button>
+        <div class="bld-nested-wrap">
+          <div class="bld-canvas"></div>
+        </div>
+        <div class="bld-hint">Tap any section to cycle its fill.</div>
+        <div class="bld-legend" aria-label="Available fills">${legend}</div>
+        <button type="button" class="bld-clear" data-clear="1">Clear all</button>
       </div>
-      <div class="bld-palette bld-textures">
-        <div class="bld-palette-title">Texture</div>
-        ${spec.textures.map(t => textureBtn(t, false)).join('')}
-        <button type="button" class="bld-chip bld-blank" data-texture="">None</button>
+    </div>`;
+}
+
+function numberShell() {
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
+  return `
+    <div class="bld-stage bld-stage-center">
+      <div class="bld-canvas-wrap">
+        <div class="bld-numpad-display" aria-live="polite">&nbsp;</div>
+        <div class="bld-numpad">
+          ${keys.map(k => `<button type="button" class="bld-key" data-key="${k}">${k}</button>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function weekShell(single) {
+  return `
+    <div class="bld-stage bld-stage-center">
+      <div class="bld-canvas-wrap">
+        <div class="bld-canvas bld-canvas-wide"></div>
+        <div class="bld-weekrow">
+          ${DAY_LABELS.map((d, i) => `<button type="button" class="bld-day" data-day="${i}">${d}</button>`).join('')}
+        </div>
+        <div class="bld-hint">${single ? 'Pick the one day that fits every rule.' : 'Tap the days to mark them good.'}</div>
       </div>
     </div>`;
 }
@@ -189,6 +204,9 @@ function nestedShell(spec) {
 function shellFor(spec) {
   if (spec.kind === 'dots') return dotsShell(spec);
   if (spec.kind === 'nested') return nestedShell(spec);
+  if (spec.kind === 'number') return numberShell();
+  if (spec.kind === 'week') return weekShell(false);
+  if (spec.kind === 'pickday') return weekShell(true);
   return centerShell(spec);
 }
 
@@ -210,7 +228,12 @@ export function renderBuilder(container, spec, onSubmit) {
   }
 
   function repaint() {
-    canvas.innerHTML = renderPanel(toPanel(spec, st), PREVIEW_SIZE);
+    if (spec.kind === 'number') {
+      root.querySelector('.bld-numpad-display').textContent = st.value || ' ';
+      return;
+    }
+    const size = spec.kind === 'week' || spec.kind === 'pickday' ? 330 : PREVIEW_SIZE;
+    canvas.innerHTML = renderPanel(toPanel(spec, st), size);
     if (spec.kind === 'dots' && spec.dotMode === 'count') {
       root.querySelector('.bld-count').textContent = `${st.count} ${st.count === 1 ? 'dot' : 'dots'}`;
     }
@@ -281,41 +304,62 @@ function wire(root, spec, st, repaint, setSel) {
     return;
   }
 
+  if (spec.kind === 'number') {
+    root.querySelectorAll('.bld-key').forEach(b => b.addEventListener('click', () => {
+      const k = b.dataset.key;
+      if (k === 'C') st.value = '';
+      else if (k === '⌫') st.value = st.value.slice(0, -1);
+      else if (st.value.length < (spec.maxLen || 8)) st.value += k;
+      repaint();
+    }));
+    return;
+  }
+
+  if (spec.kind === 'week') {
+    root.querySelectorAll('.bld-day').forEach(b => b.addEventListener('click', () => {
+      const i = parseInt(b.dataset.day, 10);
+      st.days[i] = !st.days[i];
+      b.classList.toggle('sel', st.days[i]);
+      repaint();
+    }));
+    return;
+  }
+
+  if (spec.kind === 'pickday') {
+    root.querySelectorAll('.bld-day').forEach(b => b.addEventListener('click', () => {
+      st.day = parseInt(b.dataset.day, 10);
+      root.querySelectorAll('.bld-day').forEach(x => x.classList.toggle('sel', x === b));
+      repaint();
+    }));
+    return;
+  }
+
   if (spec.kind === 'nested') {
-    const cur = () => st[st.slot.group][st.slot.i] || (st[st.slot.group][st.slot.i] = {});
-    root.querySelectorAll('[data-group]').forEach(b => b.addEventListener('click', () => {
-      st.slot = { group: b.dataset.group, i: parseInt(b.dataset.i, 10) };
-      root.querySelectorAll('[data-group]').forEach(x =>
-        x.classList.toggle('sel', x.dataset.group === b.dataset.group && x.dataset.i === b.dataset.i));
-      const sec = st[st.slot.group][st.slot.i];
-      setSel('[data-color]', 'color', sec && sec.color ? sec.color : '');
-      setSel('[data-texture]', 'texture', sec && sec.texture ? sec.texture : '');
-    }));
-    root.querySelectorAll('[data-color]').forEach(b => b.addEventListener('click', () => {
-      const sec = cur();
-      sec.color = b.dataset.color || undefined;
-      setSel('[data-color]', 'color', b.dataset.color);
-      normalizeSlot(st);
+    // Transparent SVG overlay with the exact section geometry as tap targets.
+    const wrap = root.querySelector('.bld-nested-wrap');
+    const overlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    overlay.setAttribute('viewBox', `0 0 ${PREVIEW_SIZE} ${PREVIEW_SIZE}`);
+    overlay.setAttribute('class', 'bld-nested-overlay');
+    overlay.innerHTML = nestedSectionPaths(spec.shape, PREVIEW_SIZE)
+      .map(sec => `<path d="${sec.d}" data-group="${sec.group}" data-i="${sec.i}" class="bld-sect"
+        role="button" tabindex="0" aria-label="${sec.group} section ${sec.i + 1}"/>`)
+      .join('');
+    wrap.appendChild(overlay);
+
+    const cycle = (group, i) => {
+      // -1 (blank) → 0 → 1 → … → states.length-1 → -1
+      st[group][i] = st[group][i] + 1 >= spec.states.length ? -1 : st[group][i] + 1;
       repaint();
-    }));
-    root.querySelectorAll('[data-texture]').forEach(b => b.addEventListener('click', () => {
-      const sec = cur();
-      sec.texture = b.dataset.texture || undefined;
-      setSel('[data-texture]', 'texture', b.dataset.texture);
-      normalizeSlot(st);
-      repaint();
-    }));
+    };
+    overlay.querySelectorAll('.bld-sect').forEach(p => {
+      const go = () => cycle(p.dataset.group, parseInt(p.dataset.i, 10));
+      p.addEventListener('click', go);
+      p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+    });
     root.querySelector('[data-clear]').addEventListener('click', () => {
-      st[st.slot.group][st.slot.i] = null;
-      setSel('[data-color]', 'color', '');
-      setSel('[data-texture]', 'texture', '');
+      st.outer.fill(-1);
+      st.inner.fill(-1);
       repaint();
     });
   }
-}
-
-/* An all-undefined section collapses to blank (null) so grading is consistent. */
-function normalizeSlot(st) {
-  const sec = st[st.slot.group][st.slot.i];
-  if (sec && !sec.color && !sec.texture) st[st.slot.group][st.slot.i] = null;
 }

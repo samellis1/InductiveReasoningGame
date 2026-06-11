@@ -122,7 +122,7 @@ export function requireAccount(featureName) {
 
 /* `local` (optional) is a { kind, key } handle to the saved local result, so a
    successful insert marks it posted and a later backfill won't re-submit it. */
-export function postScore({ difficulty, avgMs, accuracy, local }) {
+export function postScore({ difficulty, avgMs, accuracy, points, dayKey, local }) {
   if (!currentUser) return Promise.resolve();
   return sb.from('scores').insert({
     user_id: currentUser.id,
@@ -130,6 +130,8 @@ export function postScore({ difficulty, avgMs, accuracy, local }) {
     difficulty,
     avg_solve_ms: Math.round(avgMs),
     accuracy,
+    points: points ?? null,
+    day_key: dayKey ?? null,
   }).then(({ error }) => {
     if (error) { console.error('Leaderboard insert failed:', error.message); return; }
     if (local) markScorePosted(local.kind, local.key);
@@ -148,6 +150,7 @@ export async function backfillScores() {
     for (const p of getUnpostedScores(todayKey())) {
       await postScore({
         difficulty: p.difficulty, avgMs: p.avgMs, accuracy: p.accuracy,
+        points: p.points, dayKey: p.dayKey,
         local: { kind: p.kind, key: p.key },
       });
     }
@@ -156,33 +159,24 @@ export async function backfillScores() {
   }
 }
 
-/* ---------- Leaderboard ---------- */
+/* ---------- Leaderboard ----------
+   One screen, two tabs: today's global daily board, and your private groups.
+   Daily rows are keyed by day_key (the player's local daily date), so everyone
+   competing on daily #N is compared regardless of timezone, and the board
+   naturally resets when the daily does. Ranked by points, time as tiebreaker. */
 
-/* One tab per difficulty. "Daily" is special: it shows only today's daily-
-   challenge runs, so the board naturally refreshes at each local midnight. */
 const LEADERBOARD_TABS = [
   { key: 'daily', label: 'Daily' },
-  { key: 'easy', label: 'Easy' },
-  { key: 'medium', label: 'Medium' },
-  { key: 'hard', label: 'Hard' },
+  { key: 'groups', label: 'My Groups' },
 ];
+
+const DAILY_MAX_POINTS = 15;
 
 let activeLeaderboardTab = 'daily';
 
-function cap(s) {
-  s = String(s || '');
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-/* Local midnight as an ISO timestamp — the cutoff for "today's" daily board.
-   Matches daily.js, where the puzzle rolls over at the player's local midnight. */
-function startOfTodayISO() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
-}
-
-export async function openLeaderboard() {
+export async function openLeaderboard(tab) {
   if (!requireAccount('the leaderboard')) return;
+  if (tab) activeLeaderboardTab = tab;
   showScreen('leaderboard');
   renderLeaderboardTabs();
   loadLeaderboardTab(activeLeaderboardTab);
@@ -205,35 +199,33 @@ function renderLeaderboardTabs() {
   });
 }
 
-async function loadLeaderboardTab(diff) {
-  const container = document.getElementById('leaderboard-content');
-  const subtitle = document.getElementById('leaderboard-subtitle');
-  if (subtitle) {
-    subtitle.textContent = diff === 'daily'
-      ? "Today's daily challenge — ranked by score, then fastest average time. Resets at midnight."
-      : `${cap(diff)} difficulty — ranked by accuracy, then fastest average time.`;
-  }
-  container.innerHTML = `<div class="history-empty">Loading…</div>`;
-
-  // Rank by accuracy first (most correct wins), then by fastest average time.
-  let query = sb
+function dailyBoardQuery() {
+  return sb
     .from('scores')
-    .select('user_id, display_name, difficulty, avg_solve_ms, accuracy')
-    .eq('difficulty', diff)
-    .order('accuracy', { ascending: false })
+    .select('user_id, display_name, avg_solve_ms, accuracy, points')
+    .eq('difficulty', 'daily')
+    .eq('day_key', todayKey())
+    .order('points', { ascending: false, nullsFirst: false })
     .order('avg_solve_ms', { ascending: true })
     .limit(500);
-  if (diff === 'daily') query = query.gte('created_at', startOfTodayISO());
+}
 
-  const { data, error } = await query;
-  // Ignore results for a tab the user has since navigated away from.
-  if (activeLeaderboardTab !== diff) return;
+async function loadLeaderboardTab(key) {
+  const container = document.getElementById('leaderboard-content');
+  const subtitle = document.getElementById('leaderboard-subtitle');
 
-  const emptyMessage = diff === 'daily'
-    ? "No scores yet today — be the first to finish today's daily challenge."
-    : `No ${cap(diff)} scores yet — play a round to be the first on the board.`;
-  renderLeaderboard(container, data ? dedupBestPerUser(data) : null, error,
-    { showDifficulty: false, emptyMessage });
+  if (key === 'groups') {
+    if (subtitle) subtitle.textContent = 'Private boards for you and your friends — compare your daily results.';
+    renderGroupsList(container);
+    return;
+  }
+
+  if (subtitle) subtitle.textContent = "Today's daily challenge — ranked by points, fastest total time breaks ties.";
+  container.innerHTML = `<div class="history-empty">Loading…</div>`;
+  const { data, error } = await dailyBoardQuery();
+  if (activeLeaderboardTab !== key) return; // user switched tabs mid-load
+  renderDailyBoard(container, data ? dedupBestPerUser(data) : null, error,
+    "No scores yet today — be the first to finish today's daily challenge.");
 }
 
 function dedupBestPerUser(rows) {
@@ -241,9 +233,14 @@ function dedupBestPerUser(rows) {
   return rows.filter(r => !seen.has(r.user_id) && seen.add(r.user_id)).slice(0, 50);
 }
 
-function renderLeaderboard(container, rows, error, opts = {}) {
-  const showDifficulty = opts.showDifficulty !== false;
-  const emptyMessage = opts.emptyMessage || 'No scores yet — play a round to be the first on the board.';
+function fmtTotalTime(avgMs) {
+  const total = Math.round((avgMs * 5) / 1000); // 5 daily puzzles
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return m ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`;
+}
+
+function renderDailyBoard(container, rows, error, emptyMessage) {
   if (error) {
     container.innerHTML = `<div class="history-empty">Couldn't load the leaderboard. ${esc(error.message)}</div>`;
     return;
@@ -252,27 +249,24 @@ function renderLeaderboard(container, rows, error, opts = {}) {
     container.innerHTML = `<div class="history-empty">${esc(emptyMessage)}</div>`;
     return;
   }
-  const rowClass = showDifficulty ? '' : ' no-diff';
   const body = rows.map((r, i) => {
     const mine = currentUser && r.user_id === currentUser.id;
-    const diffCell = showDifficulty ? `<div class="num col-problems">${esc(cap(r.difficulty))}</div>` : '';
+    const pts = r.points != null ? r.points : Math.round((r.accuracy || 0) * 5); // legacy rows: solved count
     return `
-      <div class="history-row${rowClass}${mine ? ' me' : ''}">
+      <div class="history-row no-diff${mine ? ' me' : ''}">
         <div class="rank">${i + 1}</div>
         <div class="who-name">${esc(r.display_name)}${mine ? ' <span class="you">you</span>' : ''}</div>
-        ${diffCell}
-        <div class="num">${Math.round((r.accuracy || 0) * 100)}%</div>
-        <div class="avg">${(r.avg_solve_ms / 1000).toFixed(2)}s avg</div>
+        <div class="num">${pts}/${DAILY_MAX_POINTS}</div>
+        <div class="avg">${fmtTotalTime(r.avg_solve_ms)}</div>
       </div>`;
   }).join('');
   container.innerHTML = `
     <div class="history-list">
-      <div class="history-row head${rowClass}">
+      <div class="history-row head no-diff">
         <div class="rank">#</div>
         <div>Player</div>
-        ${showDifficulty ? '<div class="col-problems">Difficulty</div>' : ''}
-        <div>Accuracy</div>
-        <div>Avg Time</div>
+        <div>Points</div>
+        <div>Time</div>
       </div>
       ${body}
     </div>`;
@@ -346,16 +340,13 @@ async function loadMyGroups() {
   return { groups };
 }
 
+/* Groups live inside the leaderboard screen now (the "My Groups" tab). */
 export function openGroups() {
-  if (!requireAccount('friend groups')) return;
-  showScreen('groups');
-  renderGroupsList();
+  openLeaderboard('groups');
 }
 
-async function renderGroupsList() {
-  document.getElementById('groups-title').textContent = 'Friend Groups';
-  document.getElementById('groups-subtitle').textContent = 'Create a group and invite friends to compete on your own leaderboard.';
-  const container = document.getElementById('groups-content');
+async function renderGroupsList(container) {
+  container = container || document.getElementById('leaderboard-content');
   container.innerHTML = `<div class="history-empty">Loading…</div>`;
 
   const { groups, error } = await loadMyGroups();
@@ -445,42 +436,38 @@ function confirmLeaveGroup(groupId, name) {
   });
 }
 
+/* A group's board is today's daily ranking, filtered to that group's members. */
 async function openGroupBoard(groupId) {
-  showScreen('groups');
-  const container = document.getElementById('groups-content');
-  document.getElementById('groups-subtitle').textContent = 'Fastest average solve times in this group. Lower is better.';
+  showScreen('leaderboard');
+  const container = document.getElementById('leaderboard-content');
+  const subtitle = document.getElementById('leaderboard-subtitle');
+  if (subtitle) subtitle.textContent = "This group's results on today's daily — ranked by points.";
   container.innerHTML = `<div class="history-empty">Loading…</div>`;
 
-  const titleEl = document.getElementById('groups-title');
   const { data: memberRows, error: memberErr } = await sb
     .from('group_members')
     .select('user_id')
     .eq('group_id', groupId);
   if (memberErr) {
-    renderGroupBoardShell(container, () => renderLeaderboard(container, null, memberErr));
+    renderGroupBoardShell(container, () => renderDailyBoard(container, null, memberErr, ''));
     return;
   }
   const ids = (memberRows || []).map(r => r.user_id);
-  titleEl.textContent = 'Group Leaderboard';
+  const empty = "No one in this group has finished today's daily yet.";
   if (!ids.length) {
-    renderGroupBoardShell(container, () => renderLeaderboard(container, [], null));
+    renderGroupBoardShell(container, () => renderDailyBoard(container, [], null, empty));
     return;
   }
 
-  const { data, error } = await sb
-    .from('scores')
-    .select('user_id, display_name, difficulty, avg_solve_ms, accuracy')
-    .in('user_id', ids)
-    .order('avg_solve_ms', { ascending: true })
-    .limit(500);
-  renderGroupBoardShell(container, () => renderLeaderboard(container, data ? dedupBestPerUser(data) : null, error));
+  const { data, error } = await dailyBoardQuery().in('user_id', ids);
+  renderGroupBoardShell(container, () => renderDailyBoard(container, data ? dedupBestPerUser(data) : null, error, empty));
 }
 
 function renderGroupBoardShell(container, renderBoard) {
   renderBoard();
   const back = document.createElement('button');
   back.className = 'back-link';
-  back.textContent = '← Groups';
+  back.textContent = '← My Groups';
   back.style.marginBottom = '14px';
   back.addEventListener('click', () => openGroups());
   container.insertBefore(back, container.firstChild);

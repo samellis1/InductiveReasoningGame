@@ -235,15 +235,22 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .bld-palette {
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 10px; border: 1px solid var(--border); border-radius: 10px;
-  background: var(--panel-light); min-width: 92px;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+  align-content: start;
+  padding: 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--panel-light); min-width: 150px;
 }
-.bld-palette-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 2px; text-align: center; }
+.bld-palette-title { grid-column: 1 / -1; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 2px; text-align: center; }
 .bld-chip {
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: 4px; border: 2px solid transparent; border-radius: 8px;
-  background: #fff; cursor: pointer; min-height: 42px; min-width: 42px;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px;
+  padding: 6px; border: 2px solid transparent; border-radius: 8px;
+  background: #fff; cursor: pointer; min-height: 64px; min-width: 64px;
+}
+.bld-chip-label { font-size: 10px; color: #555; text-transform: capitalize; }
+@media (max-width: 700px) {
+  .bld-stage { flex-direction: column; align-items: center; }
+  .bld-palette { grid-template-columns: repeat(4, 1fr); width: 100%; max-width: 360px; }
 }
 .bld-chip.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
 .bld-chip:hover { border-color: var(--muted); }
@@ -270,6 +277,191 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
 .bld-cell.disabled { background: var(--panel-light); cursor: default; }
 .bld-cell:hover:not(.disabled):not(.on) { background: #eee; }
 .bld-submit { margin-top: 22px; }
+
+/* Number pad builder */
+.bld-numpad-display {
+  min-width: 180px;
+  min-height: 52px;
+  padding: 8px 16px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: #111;
+  font-size: 30px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.bld-numpad { display: grid; grid-template-columns: repeat(3, 64px); gap: 8px; }
+.bld-key {
+  min-height: 50px;
+  font-size: 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-light);
+  color: var(--text);
+  cursor: pointer;
+}
+.bld-key:hover { border-color: var(--accent); }
+
+/* Week builders (calendar pattern + pick-a-day) */
+.bld-canvas-wide { width: 330px; height: auto; min-height: 0; padding: 4px; }
+.bld-weekrow { display: flex; gap: 4px; }
+.bld-day {
+  flex: 1;
+  min-width: 40px;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-light);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+.bld-day.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Tap-to-cycle nested builder: invisible section hotspots over the preview. */
+.bld-nested-wrap { position: relative; }
+.bld-nested-overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bld-sect { fill: transparent; stroke: none; cursor: pointer; }
+.bld-sect:hover { fill: color-mix(in srgb, var(--accent) 18%, transparent); }
+.bld-sect:focus-visible { stroke: var(--accent); stroke-width: 2; outline: none; }
+.bld-legend { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; align-items: center; }
+.bld-legend-chip { display: inline-flex; border-radius: 4px; overflow: hidden; }
+
+/* ----- Per-family identity -----
+   Each puzzle family gets its own accent + frame treatment so types look,
+   play, and feel distinct. data-family is set on .panel by loadQuestion. */
+.panel[data-family] { border-top: 4px solid var(--fam-accent, var(--accent)); }
+.panel[data-family]::before {
+  content: attr(data-family);
+  display: inline-block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--fam-accent, var(--accent));
+  border: 1px solid var(--fam-accent, var(--accent));
+  border-radius: 999px;
+  padding: 3px 10px;
+  margin-bottom: 12px;
+}
+.panel[data-family="shapes"]   { --fam-accent: #0072B2; }
+.panel[data-family="dots"]     { --fam-accent: #56B4E9; }
+.panel[data-family="matrix"]   { --fam-accent: #CC79A7; }
+.panel[data-family="nested"]   { --fam-accent: #009E73; }
+.panel[data-family="number"]   { --fam-accent: #E69F00; }
+.panel[data-family="weeks"]    { --fam-accent: #D55E00; }
+.panel[data-family="schedule"] { --fam-accent: #8b5cf6; }
+
+/* Nested puzzles read better with larger frames and no arrows between them. */
+.panel[data-family="nested"] .sequence .arrow { display: none; }
+.panel[data-family="nested"] .sequence { gap: 14px; }
+
+/* Number panels: lighter frame so the digits carry the look. */
+.panel[data-family="number"] .tile { border-width: 1px; border-radius: 12px; }
+
+/* Weeks & schedule: stacked wide rows, paper-calendar feel. */
+.weeks, .schedule { display: flex; flex-direction: column; gap: 8px; align-items: center; margin-bottom: 20px; }
+.week-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.week-row svg { display: block; }
+.week-num { font-size: 11px; color: #888; min-width: 34px; font-variant-numeric: tabular-nums; }
+.question-week { border-style: dashed; color: var(--muted); background: var(--panel-light); }
+.week-q { font-size: 22px; font-weight: 300; padding: 4px 140px 4px 4px; }
+.tile.week-tile { width: auto; height: auto; padding: 8px; }
+
+/* Instruction line for puzzle families that need a hint up top. */
+.instruction {
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+}
+
+/* ----- GO button + menu links ----- */
+.go-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 420px;
+  margin: 18px auto 6px auto;
+  padding: 26px 20px;
+  border-radius: 18px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.12s ease-out, background 0.15s;
+}
+.go-btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
+.go-btn:active { transform: translateY(0); }
+.go-btn .go-word { font-size: 34px; font-weight: 700; letter-spacing: 4px; line-height: 1; }
+.go-btn .sub-note { font-size: 13px; opacity: 0.92; }
+.menu-links { display: flex; gap: 10px; justify-content: center; align-items: center; margin-top: 18px; color: var(--muted); }
+.menu-link {
+  background: none; border: none; padding: 4px 2px;
+  color: var(--muted); font-size: 14px; cursor: pointer; text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.menu-link:hover { color: var(--text); }
+.howto-gallery-note { font-size: 12px; color: var(--muted); max-width: 220px; text-align: left; }
+@media (prefers-reduced-motion: reduce) {
+  .go-btn, .go-btn:hover { transition: none; transform: none; }
+}
+
+/* ----- Game feel: shake, streak glow, pulses ----- */
+/* Decaying horizontal shake on the puzzle panel (never the viewport). */
+@keyframes irt-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+.panel.shake { animation: irt-shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+
+/* Streak heat: fixed glow layer behind everything; opacity-only changes. */
+.streak-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s ease-out, background 0.6s ease-out;
+}
+@keyframes irt-glow-tick {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+.streak-glow.glow-tick { animation: irt-glow-tick 0.5s ease-out; }
+.container, .screen { position: relative; z-index: 1; }
+
+/* Correct-answer pulse on the revealed tile (200ms overshoot). */
+@keyframes irt-pop {
+  0% { transform: scale(0.92); }
+  60% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.tile.correct { animation: irt-pop 0.22s cubic-bezier(.175,.885,.32,1.275); }
+
+@media (prefers-reduced-motion: reduce) {
+  .panel.shake { animation: none; outline: 2px solid var(--wrong); outline-offset: 2px; }
+  .streak-glow.glow-tick { animation: none; }
+  .streak-glow { transition: none; }
+  .tile.correct { animation: none; }
+}
 
 /* Answer reveal after submitting */
 .reveal { display: flex; gap: 24px; justify-content: center; align-items: flex-end; flex-wrap: wrap; }

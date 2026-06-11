@@ -32,14 +32,15 @@
     <!-- ============ MAIN MENU ============ -->
     <div class="screen menu" id="screen-menu">
       <h1>Inductive</h1>
-      <div class="subtitle">Spot the rule. Five puzzles a day.</div>
+      <div class="subtitle">Spot the rule. Five puzzles a day. Three tries each.</div>
       <div class="streak-chip" id="streak-chip" hidden></div>
 
-      <div class="menu-actions">
-        <button class="primary" id="btn-daily">Daily Challenge</button>
-      </div>
+      <button class="go-btn" id="btn-daily">
+        <span class="go-word">GO</span>
+        <span class="sub-note" id="go-note">Play today's challenge</span>
+      </button>
 
-      <div class="menu-divider">Practice</div>
+      <div class="menu-divider">More</div>
       <div class="diff-row" id="diff-row" role="group" aria-label="Practice difficulty">
         <button data-diff="easy">Easy</button>
         <button data-diff="medium" class="active">Medium</button>
@@ -47,11 +48,14 @@
       </div>
       <div class="menu-actions">
         <button id="btn-practice">Practice Round</button>
-        <button id="btn-stats">My Stats</button>
-        <button id="btn-history">Practice History</button>
-        <button id="btn-leaderboard">Global Leaderboard</button>
-        <button id="btn-groups">Friend Groups</button>
-        <button id="btn-howto">How to Play</button>
+        <button id="btn-leaderboard">Leaderboard</button>
+      </div>
+      <div class="menu-links">
+        <button class="menu-link" id="btn-stats">My Stats</button>
+        <span aria-hidden="true">·</span>
+        <button class="menu-link" id="btn-history">History</button>
+        <span aria-hidden="true">·</span>
+        <button class="menu-link" id="btn-howto">How to Play</button>
       </div>
     </div>
 
@@ -60,9 +64,10 @@
       <div class="header">
         <h1 class="round-title" id="round-title">Round in Progress</h1>
         <div class="stats">
-          <div class="stat"><span>Correct</span><b id="score">0</b></div>
+          <div class="stat"><span>Points</span><b id="score">0</b></div>
           <div class="stat"><span>Question</span><b id="problemNum">1/5</b></div>
           <div class="stat"><span>Time</span><b id="timer">0.0s</b></div>
+          <button class="quit" id="btn-mute" aria-label="Toggle sound">🔊</button>
           <button class="quit" id="btn-quit">Quit</button>
         </div>
       </div>
@@ -71,6 +76,7 @@
 
       <div class="panel">
         <div class="label" id="sequence-label">Evaluate the sequence. Which figure comes NEXT?</div>
+        <div class="instruction" id="instruction" hidden></div>
         <div class="sequence" id="sequence"></div>
 
         <div class="label" id="answer-label">Build the figure that comes next</div>
@@ -109,26 +115,14 @@
       </div>
     </div>
 
-    <!-- ============ LEADERBOARD ============ -->
+    <!-- ============ LEADERBOARD (daily board + friend groups) ============ -->
     <div class="screen" id="screen-leaderboard">
       <div class="leaderboard">
-        <h2>Global Leaderboard</h2>
-        <div class="subtitle" id="leaderboard-subtitle">Fastest average solve times across all players. Lower is better.</div>
-        <div class="lb-tabs" id="leaderboard-tabs" role="tablist" aria-label="Leaderboard difficulty"></div>
+        <h2>Leaderboard</h2>
+        <div class="subtitle" id="leaderboard-subtitle">Today's daily challenge — ranked by points.</div>
+        <div class="lb-tabs" id="leaderboard-tabs" role="tablist" aria-label="Leaderboard sections"></div>
         <div id="leaderboard-content"></div>
         <button class="back-link" id="btn-leaderboard-back">← Main Menu</button>
-      </div>
-    </div>
-
-    <!-- ============ FRIEND GROUPS ============ -->
-    <div class="screen" id="screen-groups">
-      <div class="leaderboard">
-        <h2 id="groups-title">Friend Groups</h2>
-        <div class="subtitle" id="groups-subtitle">Create a group and invite friends to compete on your own leaderboard.</div>
-        <div id="groups-content"></div>
-        <div class="history-actions">
-          <button class="back-link" id="btn-groups-back">← Main Menu</button>
-        </div>
       </div>
     </div>
 

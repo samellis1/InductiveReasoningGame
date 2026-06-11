@@ -6,7 +6,7 @@
    that alters output for a given seed, so an old cached tab and a fresh tab
    never disagree about today's puzzle. */
 
-export const DAILY_GEN_VERSION = 3;
+export const DAILY_GEN_VERSION = 4;
 export const DAILY_LENGTH = 5;
 
 /* Day #1 — launch day of the daily challenge. */
@@ -50,16 +50,20 @@ export function formatCountdown(ms) {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-/* Spoiler-free share text — tiny, textual, platform-agnostic. */
-export function shareText({ number, grid, score, total, timeMs, streak, url }) {
-  const squares = grid.map(g => (g === 'g' ? '🟩' : '🟥')).join('');
+/* Spoiler-free share text — tiny, textual, platform-agnostic.
+   Each puzzle shows the try it was solved on (1️⃣/2️⃣/3️⃣) or ❌ if missed —
+   deliberately number emojis, not colored squares (that look is NYT's). */
+const TRY_EMOJI = { 1: '1️⃣', 2: '2️⃣', 3: '3️⃣', x: '❌' };
+
+export function shareText({ number, triesGrid, points, maxPoints, timeMs, streak, url }) {
+  const tries = triesGrid.map(t => TRY_EMOJI[t] || '❌').join('');
   const t = Math.round(timeMs / 1000);
   const mins = Math.floor(t / 60);
   const secs = t % 60;
   const time = mins ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
   const lines = [
-    `Inductive #${number} ${score}/${total} ⏱ ${time}`,
-    squares,
+    `Inductive #${number} ${points}/${maxPoints} ⏱ ${time}`,
+    tries,
   ];
   if (streak >= 2) lines.push(`🔥 ${streak}-day streak`);
   if (url) lines.push(url);

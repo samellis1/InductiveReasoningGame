@@ -85,12 +85,11 @@ function diffDays(a, b) {
 }
 
 /* ---------- Leaderboard backfill bookkeeping ----------
-   A round finished while signed out (or whose insert failed) is saved locally
-   but never reaches the `scores` table. These let us find such results after
-   sign-in and post them. Each posted entry is tagged `posted: true` so we never
-   double-insert. Daily is limited to today's key because the daily board only
-   shows today's runs — backfilling an older daily would land it (with a fresh
-   created_at) on today's board, which is wrong. */
+   A daily finished while signed out (or whose insert failed) is saved locally
+   but never reaches the `scores` table. These let us find such a result after
+   sign-in and post it. Each posted entry is tagged `posted: true` so we never
+   double-insert. Limited to today's key because the daily board only shows
+   today's runs. Practice rounds are personal training and never post. */
 export function getUnpostedScores(todayKey) {
   const out = [];
   const daily = loadDaily().results[todayKey];
@@ -100,17 +99,9 @@ export function getUnpostedScores(todayKey) {
       difficulty: 'daily',
       avgMs: daily.timeMs / daily.total,
       accuracy: daily.score / daily.total,
+      points: daily.points ?? null,
+      dayKey: todayKey,
     });
-  }
-  for (const h of loadHistory()) {
-    if (h.mode === 'practice' && !h.posted && h.date && h.total) {
-      out.push({
-        kind: 'history', key: h.date,
-        difficulty: h.difficulty,
-        avgMs: (h.avg || 0) * 1000, // entry.avg is seconds-per-problem
-        accuracy: h.correct / h.total,
-      });
-    }
   }
   return out;
 }
@@ -119,10 +110,6 @@ export function markScorePosted(kind, key) {
   if (kind === 'daily') {
     const d = loadDaily();
     if (d.results[key]) { d.results[key].posted = true; write(DAILY_KEY, d); }
-  } else if (kind === 'history') {
-    const h = loadHistory();
-    const row = h.find(e => e.date === key);
-    if (row) { row.posted = true; write(HISTORY_KEY, h); }
   }
 }
 

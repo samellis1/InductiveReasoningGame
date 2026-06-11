@@ -187,30 +187,99 @@ function genAlternation(R, level) {
   };
 }
 
-/* Nested squares: outer ring rotates; inner block fills one more section each
-   step. Two different, both-inferable rules; the answer (inner fully filled) is
-   never shown, so it can't be pattern-matched. The Hard/daily flagship. */
-function genNestedSquares(R, level) {
-  const outerColors = R.sample(COLOR_NAMES, 4);          // one distinct color per outer section
-  const baseOuter = outerColors.map(c => ({ color: c }));
-  const dir = R.chance(0.5) ? 1 : 3;                     // clockwise (+1) or counter (-1 ≡ +3)
-  const innerColor = R.pick(COLOR_NAMES.filter(c => !outerColors.includes(c)));
-  const innerTex = R.pick(TEXTURES);
-  const squareAt = s => {
-    const inner = [null, null, null, null];
-    const filled = Math.min(4, s);                       // s=0..3 → 0..3 sections; answer s=4 → all 4
-    for (let k = 0; k < filled; k++) inner[k] = { color: innerColor, texture: innerTex };
-    return { nested: { outer: rotateQuadrants(baseOuter.map(x => ({ ...x })), dir * s), inner } };
+/* Nested shapes: an outer shape split into sections with a smaller copy
+   inside, also split. Outer follows one rule across the row, inner another —
+   both only inferable from multiple frames. The answer arrangement is never
+   shown, so it can't be pattern-matched.
+
+   The builder is tap-to-cycle: tapping a section steps through the exact
+   combined color+texture states this puzzle uses (answerSpec.states).
+
+   Variants by tier:
+   - square (easy):    outer colors rotate · inner fills one more section per step
+   - circle (medium):  outer colors rotate one way · inner colors rotate the other
+   - triangle (hard):  outer rotates AND its texture alternates per step ·
+                       inner counter-rotates */
+function genNestedShape(R, level, shape) {
+  const n = shape === 'triangle' ? 3 : 4;
+  const rot = (arr, k) => {
+    const out = Array(n).fill(null);
+    for (let i = 0; i < n; i++) out[(((i + k) % n) + n) % n] = arr[i];
+    return out;
   };
+  const clone = arr => arr.map(s => (s ? { ...s } : null));
+
+  const outerColors = R.sample(COLOR_NAMES, n);
+  const dir = R.chance(0.5) ? 1 : n - 1; // clockwise or counter-clockwise
+  const sectionWord = shape === 'triangle' ? 'three' : 'four';
+  const dirWord = dir === 1 ? 'clockwise' : 'counter-clockwise';
+
+  let frameAt, rule, states;
+
+  if (level <= 1) {
+    // Easy: rotation + fill-count progression.
+    const baseOuter = outerColors.map(c => ({ color: c }));
+    const innerColor = R.pick(COLOR_NAMES.filter(c => !outerColors.includes(c)));
+    const innerTex = R.pick(TEXTURES);
+    const innerState = { color: innerColor, texture: innerTex };
+    frameAt = s => {
+      const inner = Array(n).fill(null);
+      for (let k = 0; k < Math.min(n, s); k++) inner[k] = { ...innerState };
+      return { nested: { shape, outer: rot(clone(baseOuter), dir * s), inner } };
+    };
+    rule = `Outer ring: the ${sectionWord} colours rotate one step ${dirWord} each panel. `
+      + 'Inner shape: one more section fills in (clockwise from the top) each panel.';
+    states = [...baseOuter, innerState];
+  } else if (level === 2) {
+    // Medium: two opposing rotations.
+    const baseOuter = outerColors.map(c => ({ color: c }));
+    const innerColors = R.sample(COLOR_NAMES.filter(c => !outerColors.includes(c)), Math.min(3, 7 - n));
+    const innerTex = R.pick(TEXTURES);
+    const baseInner = Array(n).fill(null).map((_, i) =>
+      (i < innerColors.length ? { color: innerColors[i], texture: innerTex } : null));
+    frameAt = s => ({
+      nested: {
+        shape,
+        outer: rot(clone(baseOuter), dir * s),
+        inner: rot(clone(baseInner), -dir * s),
+      },
+    });
+    rule = `The outer colours rotate ${dirWord} each panel, while the inner sections rotate the opposite way.`;
+    states = [...baseOuter, ...baseInner.filter(Boolean)];
+  } else {
+    // Hard: rotation + per-panel texture alternation outside, counter-rotation inside.
+    const texA = R.pick(TEXTURES);
+    const texB = R.pick(TEXTURES.filter(t => t !== texA));
+    const innerColors = R.sample(COLOR_NAMES.filter(c => !outerColors.includes(c)), Math.min(2, 7 - n));
+    const baseInner = Array(n).fill(null).map((_, i) =>
+      (i < innerColors.length ? { color: innerColors[i] } : null));
+    frameAt = s => {
+      const tex = s % 2 === 0 ? texA : texB;
+      const outer = rot(outerColors.map(c => ({ color: c, texture: tex })), dir * s);
+      return { nested: { shape, outer, inner: rot(clone(baseInner), -dir * s) } };
+    };
+    rule = `Three rules at once: the outer colours rotate ${dirWord}, the outer texture alternates every panel, `
+      + 'and the inner sections rotate the opposite way.';
+    states = [
+      ...outerColors.map(c => ({ color: c, texture: texA })),
+      ...outerColors.map(c => ({ color: c, texture: texB })),
+      ...baseInner.filter(Boolean),
+    ];
+  }
+
   const frames = [];
-  for (let i = 0; i < SEQ_LEN; i++) frames.push(squareAt(i));
+  for (let i = 0; i < SEQ_LEN; i++) frames.push(frameAt(i));
   return {
-    type: 'sequence', frames, next: squareAt(SEQ_LEN),
-    rule: `Outer ring: the four colours rotate one quarter ${dir === 1 ? 'clockwise' : 'counter-clockwise'} each square. `
-      + 'Inner block: one more section fills in (clockwise from top-left) each square.',
-    answerSpec: { kind: 'nested', colors: COLOR_NAMES.slice(), textures: TEXTURES.slice() },
+    type: 'sequence', frames, next: frameAt(SEQ_LEN),
+    rule,
+    instruction: 'Watch the outer and inner sections separately — each follows its own pattern. Tap a section to cycle its fill.',
+    answerSpec: { kind: 'nested', shape, n, states },
   };
 }
+
+const genNestedSquare = (R, level) => genNestedShape(R, 1, 'square');
+const genNestedCircle = (R, level) => genNestedShape(R, 2, 'circle');
+const genNestedTriangle = (R, level) => genNestedShape(R, 3, 'triangle');
 
 /* ============================================================
    Matrix (3x3) generators — Raven's style. The answer is the empty cell.
@@ -315,41 +384,181 @@ function genMatrixOverlay(R, level) {
 }
 
 /* ============================================================
+   Number / calendar / scheduling families (hard tier)
+   ============================================================ */
+
+/* Number sequences driven by % growth and simple arithmetic. All answers are
+   integers by construction. */
+function genNumberSeq(R, level) {
+  const kind = R.pick(['percent', 'altops', 'accel']);
+  let seq, rule;
+
+  if (kind === 'percent') {
+    // ratio num/den with a start that keeps five terms integral
+    const [num, den, label] = R.pick([[3, 2, '50%'], [5, 4, '25%'], [2, 1, '100%']]);
+    const k = den === 4 ? 1 : den === 2 ? 1 + R.int(5) : 3 + R.int(6);
+    let x = Math.pow(den, SEQ_LEN) * k;
+    seq = [x];
+    for (let i = 0; i < SEQ_LEN; i++) { x = (x * num) / den; seq.push(x); }
+    rule = `Each number grows by ${label} (×${num}/${den}).`;
+  } else if (kind === 'altops') {
+    // alternate +a, ×2
+    const a = 2 + R.int(6);
+    let x = 2 + R.int(5);
+    seq = [x];
+    const ops = [];
+    for (let i = 0; i < SEQ_LEN; i++) {
+      if (i % 2 === 0) { x += a; ops.push(`+${a}`); } else { x *= 2; ops.push('×2'); }
+      seq.push(x);
+    }
+    rule = `Two alternating steps: +${a}, then ×2, repeating.`;
+  } else {
+    // growing difference: +d, +d+s, +d+2s…
+    const d = 2 + R.int(4);
+    const s = 1 + R.int(3);
+    let x = 1 + R.int(9);
+    seq = [x];
+    for (let i = 0; i < SEQ_LEN; i++) { x += d + i * s; seq.push(x); }
+    rule = `The gap between numbers grows by ${s} each step (+${d}, +${d + s}, +${d + 2 * s}…).`;
+  }
+
+  const frames = seq.slice(0, SEQ_LEN).map(v => ({ text: String(v) }));
+  return {
+    type: 'sequence', family: 'number', frames, next: { text: String(seq[SEQ_LEN]) },
+    rule,
+    instruction: 'The numbers follow a hidden rule. Work it out, then type the next number.',
+    answerSpec: { kind: 'number', maxLen: String(seq[SEQ_LEN]).length + 2 },
+  };
+}
+
+/* Calendar pattern: four week rows; the marked "good days" follow a hidden
+   rule across the weeks. Player marks week five. */
+function genWeekPattern(R, level) {
+  const kind = R.pick(['stride', 'shift']);
+  let weekAt, rule;
+
+  if (kind === 'stride') {
+    // every k-th day, counted continuously across weeks
+    const k = R.pick([2, 3]);
+    const offset = R.int(k);
+    weekAt = w => {
+      const days = Array(7).fill(null);
+      for (let i = 0; i < 7; i++) if ((w * 7 + i) % k === offset) days[i] = 'mark';
+      return { week: { days } };
+    };
+    rule = `Every ${k === 2 ? 'second' : 'third'} day is good, counted straight through the weeks — the pattern carries over each week break.`;
+  } else {
+    // a fixed set of marks slides right by s each week (wrapping)
+    const s = R.pick([1, 2, 3]);
+    const base = R.sample([0, 1, 2, 3, 4, 5, 6], 2 + R.int(2));
+    weekAt = w => {
+      const days = Array(7).fill(null);
+      for (const b of base) days[(b + s * w) % 7] = 'mark';
+      return { week: { days } };
+    };
+    rule = `The good days slide ${s} day${s > 1 ? 's' : ''} to the right each week (wrapping around the weekend).`;
+  }
+
+  const frames = [];
+  for (let w = 0; w < SEQ_LEN; w++) frames.push(weekAt(w));
+  return {
+    type: 'sequence', family: 'weeks', frames, next: weekAt(SEQ_LEN),
+    rule,
+    instruction: 'Each row is one week, oldest at the top. The good days follow a pattern — mark week five.',
+    answerSpec: { kind: 'week' },
+  };
+}
+
+/* Constraint scheduling: one week with symbol days; exactly one day satisfies
+   every rule. Solver-verified during generation. */
+function genSchedule(R, level) {
+  const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const days = Array(7).fill(null);
+    const starDays = R.sample([0, 1, 2, 3, 4, 5, 6], 1 + R.int(2));
+    starDays.forEach(d => { days[d] = 'star'; });
+    const free = [0, 1, 2, 3, 4, 5, 6].filter(d => !days[d]);
+    const diamondDays = R.sample(free, 1 + R.int(2));
+    diamondDays.forEach(d => { days[d] = 'diamond'; });
+
+    const lastStar = Math.max(...starDays);
+    const candidates = [
+      { text: 'Not on a weekend.', ok: d => d < 5 },
+      { text: 'Not on a ★ or ◆ day.', ok: d => !days[d] },
+      { text: 'Not the day right after a ★ day.', ok: d => !starDays.includes(d - 1) },
+      { text: 'Not next to a ◆ day (either side).', ok: d => !diamondDays.includes(d - 1) && !diamondDays.includes(d + 1) },
+      { text: 'After the last ★ day of the week.', ok: d => d > lastStar },
+      { text: 'Before the first ◆ day of the week.', ok: d => d < Math.min(...diamondDays) },
+      { text: 'In the first half of the week (Mon–Thu).', ok: d => d <= 3 },
+    ];
+
+    const rules = R.sample(candidates, 3);
+    const valid = [0, 1, 2, 3, 4, 5, 6].filter(d => rules.every(r => r.ok(d)));
+    if (valid.length !== 1) continue;
+
+    const answerDays = Array(7).fill(null);
+    answerDays[valid[0]] = 'mark';
+    return {
+      type: 'sequence', family: 'schedule',
+      frames: [{ week: { days } }],
+      next: { week: { days: answerDays } },
+      rule: `Only ${DAY_NAMES[valid[0]]} passes every rule: ${rules.map(r => r.text.toLowerCase().replace(/\.$/, '')).join('; ')}.`,
+      instruction: `Pick the one day that satisfies all three rules: ① ${rules[0].text} ② ${rules[1].text} ③ ${rules[2].text}`,
+      answerSpec: { kind: 'pickday' },
+    };
+  }
+  // Solver couldn't land a unique day (vanishingly unlikely) — fall back.
+  return genNumberSeq(R, level);
+}
+
+/* ============================================================
    Question assembly
    ============================================================ */
 
+/* Easy targets ~1-minute solves: every entry is a meaty 2-rule level (or the
+   nested square, whose two patterns take several frames to confirm) — no
+   single-glance answers. */
 const POOLS = {
   easy: [
-    [genCount, 2], [genSizeScale, 2], [genColorCycle, 2], [genPolygonMorph, 2], [genAlternation, 2],
+    [genNestedSquare, 1], [genCount, 2], [genSizeScale, 3], [genColorCycle, 3], [genAlternation, 3],
   ],
   medium: [
-    [genColorCycle, 3], [genSizeScale, 3], [genPolygonMorph, 2], [genNesting, 2],
-    [genMatrixRowCount, 2], [genMatrixLatin, 2], [genCount, 3], [genAlternation, 3],
+    [genNestedCircle, 2], [genColorCycle, 4], [genNesting, 2], [genPolygonMorph, 2],
+    [genMatrixRowCount, 2], [genMatrixLatin, 2], [genCount, 3],
   ],
   hard: [
-    [genMatrixLatin, 4], [genMatrixOverlay, 3], [genMatrixOverlay, 4], [genMatrixRowCount, 3],
-    [genNesting, 3], [genColorCycle, 4], [genNestedSquares, 1],
+    [genNestedTriangle, 3], [genNumberSeq, 3], [genWeekPattern, 3], [genSchedule, 3],
+    [genMatrixLatin, 4], [genMatrixOverlay, 3], [genMatrixOverlay, 4],
+    [genMatrixRowCount, 3], [genNesting, 3],
   ],
 };
 
 export const DIFFICULTIES = ['easy', 'medium', 'hard'];
 
-/* The nested-squares generator, exposed so the daily can force it as the finale. */
-export function generateNestedSquares(R) {
-  const q = genNestedSquares(R, 1);
-  return { type: q.type, frames: q.frames, next: q.next, rule: q.rule, answerSpec: q.answerSpec, difficulty: 'hard' };
+function packQuestion(q, difficulty) {
+  return {
+    type: q.type,
+    family: q.family || (q.type === 'matrix' ? 'matrix'
+      : q.answerSpec.kind === 'nested' ? 'nested'
+      : q.answerSpec.kind === 'dots' ? 'dots' : 'shapes'),
+    frames: q.frames,
+    next: q.next,
+    rule: q.rule,
+    instruction: q.instruction || null,
+    answerSpec: q.answerSpec,
+    difficulty,
+  };
+}
+
+/* The daily's fifth puzzle is always a hard nested shape — the flagship finale. */
+export function generateNestedFinale(R) {
+  const shape = R.pick(['circle', 'triangle']);
+  return packQuestion(genNestedShape(R, 3, shape), 'hard');
 }
 
 export function generateProblem(R, difficulty) {
   const pool = POOLS[difficulty] || POOLS.medium;
   const [gen, level] = R.pick(pool);
-  const q = gen(R, level);
-  return {
-    type: q.type,
-    frames: q.frames,
-    next: q.next,
-    rule: q.rule,
-    answerSpec: q.answerSpec,
-    difficulty,
-  };
+  return packQuestion(gen(R, level), difficulty);
 }

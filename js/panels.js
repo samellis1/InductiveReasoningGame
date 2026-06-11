@@ -80,11 +80,18 @@ export function canonicalPanel(p) {
   const out = {};
   if (p.divider) out.divider = true;
   if (p.grid3) out.grid3 = true;
+  if (p.text != null && p.text !== '') {
+    // Numeric text compares by value ('081' === '81'); non-numeric verbatim.
+    const n = Number(p.text);
+    out.text = Number.isFinite(n) ? String(n) : String(p.text);
+  }
+  if (p.week) out.week = p.week.days.map(d => d || null);
   if (p.shaded && p.shaded.length) out.shaded = [...p.shaded].sort((a, b) => a - b);
   if (p.quadrants && p.quadrants.some(q => q)) out.quadrants = p.quadrants.map(canonicalToken);
   if (p.center) out.center = canonicalToken(p.center);
   if (p.cells && p.cells.some(c => c)) out.cells = p.cells.map(canonicalToken);
   if (p.nested) out.nested = {
+    shape: p.nested.shape || 'square',
     outer: p.nested.outer.map(canonicalSection),
     inner: p.nested.inner.map(canonicalSection),
   };
@@ -139,6 +146,68 @@ export function textureSwatchSvg(texture, color, size = 30) {
     + `<rect x="1" y="1" width="${size - 2}" height="${size - 2}" fill="${fill}" stroke="#111" stroke-width="1"/></svg>`;
 }
 
+/* Section geometry for nested panels. A nested panel is an outer shape split
+   into sections with a smaller copy of the same shape (also split) centered
+   inside. Squares/circles have 4 sections (TL,TR,BR,BL — clockwise, matching
+   quadrant rotation semantics); triangles have 3 (top, bottom-right,
+   bottom-left). Returns [{ group: 'outer'|'inner', i, d }] — exported so the
+   builder can lay the same paths over the preview as tap targets. */
+export function nestedSectionPaths(shape, size) {
+  const c = size / 2;
+  const paths = [];
+
+  if (shape === 'circle') {
+    const sectors = (R, group) => {
+      // Quarter-disc sectors, clockwise from top-left.
+      const pts = [[c - R, c], [c, c - R], [c + R, c], [c, c + R]]; // W,N,E,S
+      const order = [[0, 1], [1, 2], [2, 3], [3, 0]]; // TL,TR,BR,BL
+      order.forEach(([a, b], i) => {
+        paths.push({
+          group, i,
+          d: `M ${c} ${c} L ${pts[a][0]} ${pts[a][1]} A ${R} ${R} 0 0 1 ${pts[b][0]} ${pts[b][1]} Z`,
+        });
+      });
+    };
+    sectors(c - 2, 'outer');
+    sectors((c - 2) * 0.52, 'inner');
+    return paths;
+  }
+
+  if (shape === 'triangle') {
+    const tri = (R, group) => {
+      // Vertices at -90°, 30°, 150°; sections fan out from the centroid.
+      const v = [-90, 30, 150].map(deg => {
+        const a = (deg * Math.PI) / 180;
+        return [c + R * Math.cos(a), c + R * Math.sin(a)];
+      });
+      for (let i = 0; i < 3; i++) {
+        const a = v[i], b = v[(i + 1) % 3];
+        paths.push({
+          group, i,
+          d: `M ${c} ${c} L ${a[0].toFixed(2)} ${a[1].toFixed(2)} L ${b[0].toFixed(2)} ${b[1].toFixed(2)} Z`,
+        });
+      }
+    };
+    tri(c - 2, 'outer');
+    tri((c - 2) * 0.48, 'inner');
+    return paths;
+  }
+
+  // square (default)
+  const quads = (ox, oy, sq, group) => {
+    const hw = sq / 2;
+    const rects = [[ox, oy], [ox + hw, oy], [ox + hw, oy + hw], [ox, oy + hw]];
+    rects.forEach(([x, y], i) => {
+      paths.push({ group, i, d: `M ${x} ${y} h ${hw} v ${hw} h ${-hw} Z` });
+    });
+  };
+  quads(0, 0, size, 'outer');
+  const innerSize = size * 0.52;
+  const io = (size - innerSize) / 2;
+  quads(io, io, innerSize, 'inner');
+  return paths;
+}
+
 /* One nested section ({color, texture} | null) → { fill, def }. The def (if any)
    is an SVG <pattern> the caller must place in the panel's <defs>. */
 function sectionFill(section, idPrefix, tag) {
@@ -154,6 +223,16 @@ function fillAttr(fill, invert) {
   if (!fill || fill === 'outline') return invert ? '#111' : 'white';
   if (fill === 'solid') return invert ? 'white' : '#111';
   return COLORS[fill] || fill; // palette name or raw value
+}
+
+function starPts(cx, cy, r) {
+  const pts = [];
+  for (let i = 0; i < 10; i++) {
+    const rad = i % 2 === 0 ? r : r * 0.45;
+    const ang = (Math.PI / 5) * i - Math.PI / 2;
+    pts.push(`${(cx + rad * Math.cos(ang)).toFixed(2)},${(cy + rad * Math.sin(ang)).toFixed(2)}`);
+  }
+  return pts.join(' ');
 }
 
 function shapePoints(kind, cx, cy, r) {
@@ -280,27 +359,44 @@ export function renderPanel(panel, size = 120) {
     }
   }
   if (panel.center) content += tokenSvg(panel.center, half, half, 38);
+  if (panel.text != null && panel.text !== '') {
+    const str = String(panel.text);
+    const fs = str.length <= 3 ? 44 : str.length <= 5 ? 32 : 24;
+    content += `<text x="${half}" y="${half}" text-anchor="middle" dominant-baseline="central"
+      font-size="${fs}" font-weight="600" fill="#111" font-family="inherit">${str}</text>`;
+  }
+  if (panel.week) {
+    // One week as 7 cells with day initials; a cell can hold a mark (solid
+    // dot), a star, or a diamond. Wide panel: callers render it at full width.
+    const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    const cw = s / 7;
+    for (let i = 0; i < 7; i++) {
+      const x = i * cw;
+      content += `<rect x="${x.toFixed(2)}" y="0" width="${cw.toFixed(2)}" height="${s / 7 * 2}" fill="white" stroke="#bbb" stroke-width="1"/>`
+        + `<text x="${(x + cw / 2).toFixed(2)}" y="${s / 7 * 0.55}" text-anchor="middle" font-size="${cw * 0.38}" fill="#888" font-family="inherit">${labels[i]}</text>`;
+      const d = panel.week.days[i];
+      const cy = s / 7 * 1.35, r = cw * 0.26;
+      const cx = x + cw / 2;
+      if (d === 'mark') content += `<circle cx="${cx.toFixed(2)}" cy="${cy}" r="${r.toFixed(2)}" fill="${COLORS.green}" stroke="#111" stroke-width="1"/>`;
+      else if (d === 'star') content += `<polygon points="${starPts(cx, cy, r * 1.25)}" fill="${COLORS.orange}" stroke="#111" stroke-width="1"/>`;
+      else if (d === 'diamond') content += `<polygon points="${cx},${(cy - r * 1.2).toFixed(2)} ${(cx + r * 1.2).toFixed(2)},${cy} ${cx},${(cy + r * 1.2).toFixed(2)} ${(cx - r * 1.2).toFixed(2)},${cy}" fill="${COLORS.blue}" stroke="#111" stroke-width="1"/>`;
+    }
+  }
   if (panel.nested) {
-    // Outer square split into 4 quadrants (TL, TR, BR, BL), then a smaller
-    // inner square (~52%) drawn on top, also split into 4.
-    const drawQuads = (sections, ox, oy, sq, tag) => {
-      const hw = sq / 2;
-      const rects = [[ox, oy], [ox + hw, oy], [ox + hw, oy + hw], [ox, oy + hw]];
-      let out = '';
-      for (let i = 0; i < 4; i++) {
-        const { fill, def } = sectionFill((sections || [])[i], pid, tag + i);
-        if (def) defs += def;
-        const [x, y] = rects[i];
-        out += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${hw.toFixed(2)}" height="${hw.toFixed(2)}" fill="${fill}" stroke="#111" stroke-width="1"/>`;
-      }
-      return out;
-    };
-    content += drawQuads(panel.nested.outer, 0, 0, s, 'o');
-    const innerSize = s * 0.52;
-    const io = (s - innerSize) / 2;
-    content += drawQuads(panel.nested.inner, io, io, innerSize, 'i');
-    content += `<rect x="${io.toFixed(2)}" y="${io.toFixed(2)}" width="${innerSize.toFixed(2)}" height="${innerSize.toFixed(2)}" fill="none" stroke="#111" stroke-width="2"/>`;
+    const shape = panel.nested.shape || 'square';
+    const sections = nestedSectionPaths(shape, s);
+    let innerOutline = '';
+    for (const sec of sections) {
+      const state = (panel.nested[sec.group] || [])[sec.i];
+      const { fill, def } = sectionFill(state, pid, sec.group[0] + sec.i);
+      if (def) defs += def;
+      content += `<path d="${sec.d}" fill="${fill}" stroke="#111" stroke-width="1"/>`;
+      if (sec.group === 'inner') innerOutline += `<path d="${sec.d}" fill="none" stroke="#111" stroke-width="1.6"/>`;
+    }
+    content += innerOutline; // heavier inner border drawn on top so it reads as its own shape
   }
 
-  return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" role="img" aria-hidden="true">${defs ? `<defs>${defs}</defs>` : ''}${bg}${lines}${content}</svg>`;
+  // Week panels are wide (7 cells), not square.
+  const h = panel.week ? (s / 7) * 2 : s;
+  return `<svg width="${s}" height="${h}" viewBox="0 0 ${s} ${h}" role="img" aria-hidden="true">${defs ? `<defs>${defs}</defs>` : ''}${bg}${lines}${content}</svg>`;
 }
