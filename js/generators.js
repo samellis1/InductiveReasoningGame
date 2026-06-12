@@ -238,30 +238,9 @@ function genAlternation(R, level) {
   };
 }
 
-/* Nested shapes: an outer shape split into sections with a smaller copy
-   inside, also split. Outer follows one rule across the row, inner another —
-   both only inferable from multiple frames. The answer arrangement is never
-   shown, so it can't be pattern-matched.
-
-   The builder is tap-to-cycle: tapping a section steps through the exact
-   combined color+texture states this puzzle uses (answerSpec.states).
-
-   Variants by tier:
-   - square (easy):    outer colors rotate · inner fills one more section per step
-   - circle (medium):  outer colors rotate one way · inner colors rotate the other
-   - triangle (hard):  outer rotates AND its texture alternates per step ·
-                       inner counter-rotates */
-/* Every nested variant runs on a shared FIVE-state cycle (the owner's "5
-   pattern texture examples"): each section steps through the same 5 fills,
-   offset from its neighbours. A 5-cycle over 4 shown panels + 1 answer means
-   the answer can never repeat a shown frame (period 5 > 4) — the old pure
-   rotations had period n=3/4 and provably repeated frame 1 or 2.
-
-   NOTE: the deeper pattern-logic redesign is awaiting the owner's reference
-   picture; this is the approved interim. */
 /* Five visually-distinct fills from 4 colors + 2 textures: three plain colors,
-   then two textured accents (one per texture). Guarantees both textures show
-   and all five read apart even though we only have four colors. */
+   then two textured accents (one per texture). All five read apart even though
+   we only have four colors. */
 function fiveFills(R) {
   const c = R.shuffle(COLOR_NAMES.slice());
   const t = R.shuffle(TEXTURES.slice());
@@ -274,105 +253,77 @@ function fiveFills(R) {
   ];
 }
 
+/* Nested "pattern of 5" puzzle (the owner's reference mechanic).
+
+   One ordered pattern P of FIVE DISTINCT fills. Every section — all four outer
+   plus all four inner (three for triangles, single-layer) — steps through P at
+   its own phase, advancing each frame. Across the four shown frames a section
+   reveals four of its five states; the ANSWER is each section's unshown fifth.
+   You reconstruct the whole five-pattern by cross-referencing sections at
+   different phases ("figure out half from three, the rest from two and the
+   last one"). Distinct states ⇒ a unique answer, and a 5-pattern over 4 shown
+   frames ⇒ the answer is never a copy of a shown frame.
+
+   Difficulty levers: tidy vs scrambled phases, plain-colour vs colour+texture
+   states, and (top tier) some sections advancing two steps at a time. */
 function genNestedShape(R, level, shape) {
   const n = shape === 'triangle' ? 3 : 4;
-  const dir = R.chance(0.5) ? 1 : -1;
-  const at = (cycle, k) => cycle[(((k % 5) + 5) % 5)];
-  const dirWord = dir === 1 ? 'forward' : 'backward';
+  const single = shape === 'triangle';            // triangles stay single-layer
+  const sections = single ? n : 2 * n;
+  const scramble = level >= 3;
+  const uneven = level >= 4;
 
-  let frameAt, rule, states;
+  // Pattern of 5 distinct fills. Easy/medium: a blank + four plain colours
+  // (cleanest). Hard/double: five colour+texture combos (subtler to tell apart).
+  const cols = R.shuffle(COLOR_NAMES.slice());
+  const P = level <= 2
+    ? R.shuffle([null, ...cols.map(c => ({ color: c }))])
+    : R.shuffle(fiveFills(R));
 
-  if (level <= 1) {
-    // Easy (square): outer sections walk a 5-cycle of 4 colours + a gap (the
-    // blank slides around the ring); inner fills one more section per panel
-    // with a single textured fill (distinct from the plain outer colours).
-    const colors = R.sample(COLOR_NAMES, 4);
-    const cycle = [...colors.map(c => ({ color: c })), null];
-    const innerState = { color: colors[0], texture: R.pick(TEXTURES) };
-    frameAt = s => {
-      const inner = Array(n).fill(null);
-      for (let k = 0; k < Math.min(n, s); k++) inner[k] = { ...innerState };
-      return {
-        nested: {
-          shape,
-          outer: Array(n).fill(null).map((_, j) => { const v = at(cycle, dir * s + j); return v ? { ...v } : null; }),
-          inner,
-        },
-      };
-    };
-    rule = 'Outer ring: the four colours and one gap slide one step around a five-fill cycle each panel. '
-      + 'Inner shape: one more section fills in each panel.';
-    states = [...colors.map(c => ({ color: c })), innerState];
-  } else if (level === 2) {
-    // Medium (circle): outer walks a 5-cycle of 3 colours + 2 gaps; the inner
-    // sections walk a different 5-cycle (2 textured fills + 3 gaps) the
-    // opposite way. The textured inner fills reuse colours but the texture
-    // keeps them distinct from the plain outer sections.
-    const colors = R.sample(COLOR_NAMES, 3);
-    const tex = R.shuffle(TEXTURES.slice());
-    const innerColors = R.sample(COLOR_NAMES, 2);
-    const innerFills = [
-      { color: innerColors[0], texture: tex[0] },
-      { color: innerColors[1], texture: tex[1] },
-    ];
-    const outerCycle = [...colors.map(c => ({ color: c })), null, null];
-    const innerCycle = [...innerFills, null, null, null];
-    frameAt = s => ({
-      nested: {
-        shape,
-        outer: Array(n).fill(null).map((_, j) => { const v = at(outerCycle, dir * s + j); return v ? { ...v } : null; }),
-        inner: Array(n).fill(null).map((_, j) => { const v = at(innerCycle, -dir * s + j); return v ? { ...v } : null; }),
-      },
-    });
-    rule = `Outer ring: three colours and two gaps slide ${dirWord} through a five-fill cycle each panel. `
-      + 'Inner ring: two patterned fills slide through their own five-cycle the opposite way.';
-    states = [...colors.map(c => ({ color: c })), ...innerFills];
-  } else if (level === 3) {
-    // Hard (single layer — squares, circles, triangles): all five fills are
-    // distinct colour+texture combos; each section steps through the same
-    // 5-cycle but sits TWO steps from its neighbour, so the motion is hard to
-    // eyeball. Works for any section count (3 or 4).
-    const secWord = n === 3 ? 'three' : 'four';
-    const cycle = fiveFills(R);
-    frameAt = s => ({
-      nested: {
-        shape,
-        outer: Array(n).fill(null).map((_, j) => ({ ...at(cycle, dir * s + 2 * j) })),
-        inner: [],
-      },
-    });
-    rule = `All ${secWord} sections step through the same five-fill cycle each panel — but each section sits two steps ahead of its neighbour.`;
-    states = cycle.map(v => ({ ...v }));
-  } else {
-    // Double (level 4, square/circle): BOTH rings run the offset-5-cycle,
-    // sharing the same five fills (so the drag tray still holds exactly five).
-    // The inner ring runs the opposite direction and starts a phase apart, so
-    // the two layers never simply mirror each other. Combined arrangement has
-    // period 5 > 4 shown panels, so the answer can't copy a shown frame.
-    const cycle = fiveFills(R);
-    const phase = 1 + R.int(4); // offset the inner ring off the outer
-    frameAt = s => ({
-      nested: {
-        shape,
-        outer: Array(n).fill(null).map((_, j) => ({ ...at(cycle, dir * s + 2 * j) })),
-        inner: Array(n).fill(null).map((_, j) => ({ ...at(cycle, -dir * s + 2 * j + phase) })),
-      },
-    });
-    rule = 'Both rings draw from the same five fills: the outer sections step '
-      + `${dirWord}, each two ahead of its neighbour, while the inner sections step the opposite way.`;
-    states = cycle.map(v => ({ ...v }));
+  // Per-section phase (start point in P) and step (places advanced per frame).
+  // Tidy on easy (outer & inner march by position); scattered on hard; some
+  // 2-steps on the top tier. Retry until all five states are visible across
+  // the shown frames, so the player can always reconstruct the full pattern.
+  let phases, steps;
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (scramble) {
+      const base = [0, 1, 2, 3, 4];
+      while (base.length < sections) base.push(R.int(5));
+      phases = R.shuffle(base).slice(0, sections);
+    } else {
+      phases = Array.from({ length: sections }, (_, i) => (i % n) % 5);
+    }
+    steps = phases.map((_, i) => (uneven && i % 3 === 0 ? 2 : 1));
+    const shown = new Set();
+    for (let i = 0; i < sections; i++)
+      for (let f = 0; f < SEQ_LEN; f++) shown.add((((phases[i] + steps[i] * f) % 5) + 5) % 5);
+    if (shown.size === 5) break;
   }
 
-  // Single-layer when the rule produced no inner sections.
-  const single = frameAt(0).nested.inner.length === 0;
+  const at = (i, f) => {
+    const v = P[(((phases[i] + steps[i] * f) % 5) + 5) % 5];
+    return v ? { ...v } : null;
+  };
+  const frameAt = f => ({
+    nested: {
+      shape,
+      outer: Array(n).fill(null).map((_, j) => at(j, f)),
+      inner: single ? [] : Array(n).fill(null).map((_, j) => at(n + j, f)),
+    },
+  });
+
   const frames = [];
   for (let i = 0; i < SEQ_LEN; i++) frames.push(frameAt(i));
+  const states = P.filter(Boolean).map(v => ({ ...v }));
   return {
-    type: 'sequence', frames, next: frameAt(SEQ_LEN),
-    rule,
+    type: 'sequence', family: 'nested', frames, next: frameAt(SEQ_LEN),
+    rule: 'Every section follows the same repeating pattern of five fills, each '
+      + 'starting at a different point in it'
+      + (uneven ? ' and some advancing two steps at a time' : '')
+      + '. Each section’s answer is the one fill it hasn’t shown yet.',
     instruction: single
-      ? 'The five fills below cycle through the sections. Drag (or tap-then-tap) a fill onto each section.'
-      : 'Outer and inner each follow their own pattern, both built from the five fills below. Drag a fill onto each section.',
+      ? 'Each section cycles through one shared 5-step pattern (starting in different places). Work out the pattern, then fill the next frame.'
+      : 'Every outer and inner section cycles through one shared 5-step pattern, each at its own start point. Fill in the next frame.',
     answerSpec: { kind: 'nested', shape, n, single, states },
   };
 }
