@@ -29,11 +29,12 @@ const BORDER8 = [0, 1, 2, 5, 8, 7, 6, 3];
 /* Fill order for counting patterns — border first, centre last (9 slots). */
 const FILL9 = [0, 1, 2, 5, 8, 7, 6, 3, 4];
 
-/* Ordered color triples with strong luminance spread (colorblind-safe). */
+/* Ordered color triples with strong luminance spread (colorblind-safe),
+   drawn from the four-color palette (blue/orange/green/red). */
 const COLOR_CYCLES = [
-  ['yellow', 'orange', 'blue'],
-  ['sky', 'red', 'green'],
-  ['yellow', 'green', 'purple'],
+  ['blue', 'orange', 'green'],
+  ['red', 'green', 'blue'],
+  ['orange', 'red', 'blue'],
 ];
 
 const flip = f => (f === 'solid' ? 'outline' : 'solid');
@@ -258,10 +259,23 @@ function genAlternation(R, level) {
 
    NOTE: the deeper pattern-logic redesign is awaiting the owner's reference
    picture; this is the approved interim. */
+/* Five visually-distinct fills from 4 colors + 2 textures: three plain colors,
+   then two textured accents (one per texture). Guarantees both textures show
+   and all five read apart even though we only have four colors. */
+function fiveFills(R) {
+  const c = R.shuffle(COLOR_NAMES.slice());
+  const t = R.shuffle(TEXTURES.slice());
+  return [
+    { color: c[0] },
+    { color: c[1] },
+    { color: c[2] },
+    { color: c[3 % c.length], texture: t[0] },
+    { color: c[0], texture: t[1] },
+  ];
+}
+
 function genNestedShape(R, level, shape) {
   const n = shape === 'triangle' ? 3 : 4;
-  // Hard variants and all triangles are single-layer (no inner shape — owner).
-  const single = shape === 'triangle' || level >= 3;
   const dir = R.chance(0.5) ? 1 : -1;
   const at = (cycle, k) => cycle[(((k % 5) + 5) % 5)];
   const dirWord = dir === 1 ? 'forward' : 'backward';
@@ -270,10 +284,11 @@ function genNestedShape(R, level, shape) {
 
   if (level <= 1) {
     // Easy (square): outer sections walk a 5-cycle of 4 colours + a gap (the
-    // blank slides around the ring); inner fills one more section per panel.
+    // blank slides around the ring); inner fills one more section per panel
+    // with a single textured fill (distinct from the plain outer colours).
     const colors = R.sample(COLOR_NAMES, 4);
     const cycle = [...colors.map(c => ({ color: c })), null];
-    const innerState = { color: R.pick(COLOR_NAMES.filter(c => !colors.includes(c))), texture: R.pick(TEXTURES) };
+    const innerState = { color: colors[0], texture: R.pick(TEXTURES) };
     frameAt = s => {
       const inner = Array(n).fill(null);
       for (let k = 0; k < Math.min(n, s); k++) inner[k] = { ...innerState };
@@ -291,12 +306,17 @@ function genNestedShape(R, level, shape) {
   } else if (level === 2) {
     // Medium (circle): outer walks a 5-cycle of 3 colours + 2 gaps; the inner
     // sections walk a different 5-cycle (2 textured fills + 3 gaps) the
-    // opposite way.
+    // opposite way. The textured inner fills reuse colours but the texture
+    // keeps them distinct from the plain outer sections.
     const colors = R.sample(COLOR_NAMES, 3);
-    const tex = R.pick(TEXTURES);
-    const texColors = R.sample(COLOR_NAMES.filter(c => !colors.includes(c)), 2);
+    const tex = R.shuffle(TEXTURES.slice());
+    const innerColors = R.sample(COLOR_NAMES, 2);
+    const innerFills = [
+      { color: innerColors[0], texture: tex[0] },
+      { color: innerColors[1], texture: tex[1] },
+    ];
     const outerCycle = [...colors.map(c => ({ color: c })), null, null];
-    const innerCycle = [...texColors.map(c => ({ color: c, texture: tex })), null, null, null];
+    const innerCycle = [...innerFills, null, null, null];
     frameAt = s => ({
       nested: {
         shape,
@@ -306,14 +326,14 @@ function genNestedShape(R, level, shape) {
     });
     rule = `Outer ring: three colours and two gaps slide ${dirWord} through a five-fill cycle each panel. `
       + 'Inner ring: two patterned fills slide through their own five-cycle the opposite way.';
-    states = [...colors.map(c => ({ color: c })), ...texColors.map(c => ({ color: c, texture: tex }))];
-  } else {
-    // Hard (triangle, single layer): all five fills are distinct colour+texture
-    // combos; each of the three sections steps through the same 5-cycle but
-    // sits TWO steps from its neighbour, so the motion is hard to eyeball.
-    const colors = R.sample(COLOR_NAMES, 5);
-    const texs = [null, ...R.sample(TEXTURES, 4)];
-    const cycle = colors.map((c, i) => (texs[i] ? { color: c, texture: texs[i] } : { color: c }));
+    states = [...colors.map(c => ({ color: c })), ...innerFills];
+  } else if (level === 3) {
+    // Hard (single layer — squares, circles, triangles): all five fills are
+    // distinct colour+texture combos; each section steps through the same
+    // 5-cycle but sits TWO steps from its neighbour, so the motion is hard to
+    // eyeball. Works for any section count (3 or 4).
+    const secWord = n === 3 ? 'three' : 'four';
+    const cycle = fiveFills(R);
     frameAt = s => ({
       nested: {
         shape,
@@ -321,10 +341,30 @@ function genNestedShape(R, level, shape) {
         inner: [],
       },
     });
-    rule = 'All three sections step through the same five-fill cycle each panel — but each section sits two steps ahead of its neighbour.';
+    rule = `All ${secWord} sections step through the same five-fill cycle each panel — but each section sits two steps ahead of its neighbour.`;
+    states = cycle.map(v => ({ ...v }));
+  } else {
+    // Double (level 4, square/circle): BOTH rings run the offset-5-cycle,
+    // sharing the same five fills (so the drag tray still holds exactly five).
+    // The inner ring runs the opposite direction and starts a phase apart, so
+    // the two layers never simply mirror each other. Combined arrangement has
+    // period 5 > 4 shown panels, so the answer can't copy a shown frame.
+    const cycle = fiveFills(R);
+    const phase = 1 + R.int(4); // offset the inner ring off the outer
+    frameAt = s => ({
+      nested: {
+        shape,
+        outer: Array(n).fill(null).map((_, j) => ({ ...at(cycle, dir * s + 2 * j) })),
+        inner: Array(n).fill(null).map((_, j) => ({ ...at(cycle, -dir * s + 2 * j + phase) })),
+      },
+    });
+    rule = 'Both rings draw from the same five fills: the outer sections step '
+      + `${dirWord}, each two ahead of its neighbour, while the inner sections step the opposite way.`;
     states = cycle.map(v => ({ ...v }));
   }
 
+  // Single-layer when the rule produced no inner sections.
+  const single = frameAt(0).nested.inner.length === 0;
   const frames = [];
   for (let i = 0; i < SEQ_LEN; i++) frames.push(frameAt(i));
   return {
@@ -332,7 +372,7 @@ function genNestedShape(R, level, shape) {
     rule,
     instruction: single
       ? 'The five fills below cycle through the sections. Drag (or tap-then-tap) a fill onto each section.'
-      : 'Outer and inner follow separate patterns built from the five fills below. Drag a fill onto each section.',
+      : 'Outer and inner each follow their own pattern, both built from the five fills below. Drag a fill onto each section.',
     answerSpec: { kind: 'nested', shape, n, single, states },
   };
 }
@@ -340,6 +380,13 @@ function genNestedShape(R, level, shape) {
 const genNestedSquare = (R, level) => genNestedShape(R, 1, 'square');
 const genNestedCircle = (R, level) => genNestedShape(R, 2, 'circle');
 const genNestedTriangle = (R, level) => genNestedShape(R, 3, 'triangle');
+// Hard, single-layer variants of the offset-5-cycle mechanic (the one the
+// owner liked on triangles) applied to squares and circles too.
+const genNestedSquareHard = (R, level) => genNestedShape(R, 3, 'square');
+const genNestedCircleHard = (R, level) => genNestedShape(R, 3, 'circle');
+// Double (two-layer) variants: outer AND inner each run the offset-5-cycle.
+const genNestedSquareDouble = (R, level) => genNestedShape(R, 4, 'square');
+const genNestedCircleDouble = (R, level) => genNestedShape(R, 4, 'circle');
 
 /* ============================================================
    Matrix (3x3) generators — Raven's style. The answer is the empty cell.
@@ -355,7 +402,7 @@ function matrixFrames(cellAt) {
 function genMatrixLatin(R, level) {
   const shapes = R.sample(SHAPES, 3);
   const fills = R.chance(0.5)
-    ? ['outline', 'solid', R.pick(['blue', 'orange', 'green', 'purple'])]
+    ? ['outline', 'solid', R.pick(COLOR_NAMES)]
     : R.pick(COLOR_CYCLES).slice();
   const shapeLatin = level >= 2; // easy: shape constant per row; medium+: shapes Latin too
   const sizeLatin = level >= 4;
@@ -730,7 +777,9 @@ const POOLS = {
     [genMatrixRowCount, 2], [genMatrixLatin, 2],
   ],
   hard: [
-    [genNestedTriangle, 3], [genNumberSeq, 3], [genMonthReqs, 3], [genSchedule, 3],
+    [genNestedTriangle, 3], [genNestedSquareHard, 3], [genNestedCircleHard, 3],
+    [genNestedSquareDouble, 4], [genNestedCircleDouble, 4],
+    [genNumberSeq, 3], [genMonthReqs, 3], [genSchedule, 3],
     [genGridPlace, 3], [genRatioWord, 3], [genRatioBars, 3],
     [genMatrixLatin, 4], [genMatrixOverlay, 3], [genMatrixOverlay, 4],
     [genMatrixRowCount, 3], [genNesting, 3],
@@ -757,8 +806,12 @@ function packQuestion(q, difficulty) {
 
 /* The daily's fifth puzzle is always a hard nested shape — the flagship finale. */
 export function generateNestedFinale(R) {
-  const shape = R.pick(['circle', 'triangle']);
-  return packQuestion(genNestedShape(R, 3, shape), 'hard');
+  // Mix single-layer (3) and double (4) shape variants for the daily closer.
+  const pick = R.pick([
+    ['triangle', 3], ['square', 3], ['circle', 3],
+    ['square', 4], ['circle', 4],
+  ]);
+  return packQuestion(genNestedShape(R, pick[1], pick[0]), 'hard');
 }
 
 export function generateProblem(R, difficulty) {

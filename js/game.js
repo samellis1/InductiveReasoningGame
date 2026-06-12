@@ -616,7 +616,7 @@ function howToPlay(fromBoot) {
   const nestedMini = {
     nested: {
       outer: [{ color: 'blue' }, { color: 'orange' }, { color: 'green' }, { color: 'red' }],
-      inner: [{ color: 'purple', texture: 'stripes' }, { color: 'purple', texture: 'stripes' }, null, null],
+      inner: [{ color: 'red', texture: 'stripes' }, { color: 'red', texture: 'stripes' }, null, null],
     },
   };
   openModal(`

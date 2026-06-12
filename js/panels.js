@@ -25,14 +25,16 @@
    encode a rule in hue alone — color rules always ride on ordered palettes
    with luminance contrast, or pair with a second attribute. */
 
+/* Four strong, well-separated hues — one each from the blue / green / orange /
+   red families, spaced around the wheel so they never read alike. Orange is a
+   true orange (the old Okabe–Ito orange looked yellow) and red is a true red,
+   pulled apart so they don't collide. Textures add a colorblind-safe second
+   channel on top, which matters most where orange/red sit closest. */
 export const COLORS = {
   blue:   '#0072B2',
-  orange: '#E69F00',
+  orange: '#E8730E',
   green:  '#009E73',
-  yellow: '#F0E442',
-  red:    '#D55E00',
-  purple: '#CC79A7',
-  sky:    '#56B4E9',
+  red:    '#D11A2A',
 };
 
 export const COLOR_NAMES = Object.keys(COLORS);
@@ -106,7 +108,10 @@ export function panelEq(a, b) {
 
 /* Section textures for the nested-squares puzzle. A section is a solid color
    and/or one of these textures, or blank. */
-export const TEXTURES = ['stripes', 'dots', 'crosshatch', 'checker'];
+/* Two textures only — dots and diagonal stripes. They read clearly at puzzle
+   size and give a colorblind-safe second channel. (crosshatch/checker render
+   cases remain below as harmless fallbacks but are no longer generated.) */
+export const TEXTURES = ['stripes', 'dots'];
 
 /* Pattern element ids must be unique per inline <svg> — duplicate ids across
    inline SVGs make url(#id) resolve to the wrong (first) pattern in document
