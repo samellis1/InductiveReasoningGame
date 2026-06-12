@@ -122,7 +122,7 @@ export function requireAccount(featureName) {
 
 /* `local` (optional) is a { kind, key } handle to the saved local result, so a
    successful insert marks it posted and a later backfill won't re-submit it. */
-export function postScore({ difficulty, avgMs, accuracy, points, dayKey, local }) {
+export function postScore({ difficulty, avgMs, accuracy, attempts, dayKey, local }) {
   if (!currentUser) return Promise.resolve();
   return sb.from('scores').insert({
     user_id: currentUser.id,
@@ -130,7 +130,7 @@ export function postScore({ difficulty, avgMs, accuracy, points, dayKey, local }
     difficulty,
     avg_solve_ms: Math.round(avgMs),
     accuracy,
-    points: points ?? null,
+    attempts: attempts ?? null,
     day_key: dayKey ?? null,
   }).then(({ error }) => {
     if (error) { console.error('Leaderboard insert failed:', error.message); return; }
@@ -150,7 +150,7 @@ export async function backfillScores() {
     for (const p of getUnpostedScores(todayKey())) {
       await postScore({
         difficulty: p.difficulty, avgMs: p.avgMs, accuracy: p.accuracy,
-        points: p.points, dayKey: p.dayKey,
+        attempts: p.attempts, dayKey: p.dayKey,
         local: { kind: p.kind, key: p.key },
       });
     }
@@ -163,14 +163,12 @@ export async function backfillScores() {
    One screen, two tabs: today's global daily board, and your private groups.
    Daily rows are keyed by day_key (the player's local daily date), so everyone
    competing on daily #N is compared regardless of timezone, and the board
-   naturally resets when the daily does. Ranked by points, time as tiebreaker. */
+   naturally resets when the daily does. Ranked by solved, then attempts, then time. */
 
 const LEADERBOARD_TABS = [
   { key: 'daily', label: 'Daily' },
   { key: 'groups', label: 'My Groups' },
 ];
-
-const DAILY_MAX_POINTS = 15;
 
 let activeLeaderboardTab = 'daily';
 
@@ -199,13 +197,15 @@ function renderLeaderboardTabs() {
   });
 }
 
+/* Rank: most solved, then fewest total attempts, then fastest total time. */
 function dailyBoardQuery() {
   return sb
     .from('scores')
-    .select('user_id, display_name, avg_solve_ms, accuracy, points')
+    .select('user_id, display_name, avg_solve_ms, accuracy, attempts')
     .eq('difficulty', 'daily')
     .eq('day_key', todayKey())
-    .order('points', { ascending: false, nullsFirst: false })
+    .order('accuracy', { ascending: false })
+    .order('attempts', { ascending: true, nullsFirst: false })
     .order('avg_solve_ms', { ascending: true })
     .limit(500);
 }
@@ -220,7 +220,7 @@ async function loadLeaderboardTab(key) {
     return;
   }
 
-  if (subtitle) subtitle.textContent = "Today's daily challenge — ranked by points, fastest total time breaks ties.";
+  if (subtitle) subtitle.textContent = "Today's daily challenge — most solved, then fewest attempts, then fastest time.";
   container.innerHTML = `<div class="history-empty">Loading…</div>`;
   const { data, error } = await dailyBoardQuery();
   if (activeLeaderboardTab !== key) return; // user switched tabs mid-load
@@ -251,21 +251,23 @@ function renderDailyBoard(container, rows, error, emptyMessage) {
   }
   const body = rows.map((r, i) => {
     const mine = currentUser && r.user_id === currentUser.id;
-    const pts = r.points != null ? r.points : Math.round((r.accuracy || 0) * 5); // legacy rows: solved count
+    const solved = Math.round((r.accuracy || 0) * 5);
     return `
-      <div class="history-row no-diff${mine ? ' me' : ''}">
+      <div class="history-row lb-attempts${mine ? ' me' : ''}">
         <div class="rank">${i + 1}</div>
         <div class="who-name">${esc(r.display_name)}${mine ? ' <span class="you">you</span>' : ''}</div>
-        <div class="num">${pts}/${DAILY_MAX_POINTS}</div>
+        <div class="num">${solved}/5</div>
+        <div class="num">${r.attempts != null ? r.attempts : '—'}</div>
         <div class="avg">${fmtTotalTime(r.avg_solve_ms)}</div>
       </div>`;
   }).join('');
   container.innerHTML = `
     <div class="history-list">
-      <div class="history-row head no-diff">
+      <div class="history-row head lb-attempts">
         <div class="rank">#</div>
         <div>Player</div>
-        <div>Points</div>
+        <div>Solved</div>
+        <div>Attempts</div>
         <div>Time</div>
       </div>
       ${body}
@@ -441,7 +443,7 @@ async function openGroupBoard(groupId) {
   showScreen('leaderboard');
   const container = document.getElementById('leaderboard-content');
   const subtitle = document.getElementById('leaderboard-subtitle');
-  if (subtitle) subtitle.textContent = "This group's results on today's daily — ranked by points.";
+  if (subtitle) subtitle.textContent = "This group's results on today's daily — most solved, fewest attempts, fastest time.";
   container.innerHTML = `<div class="history-empty">Loading…</div>`;
 
   const { data: memberRows, error: memberErr } = await sb

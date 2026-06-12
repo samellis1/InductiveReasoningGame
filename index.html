@@ -29,6 +29,24 @@
       </div>
     </div>
 
+    <!-- ============ DAILY INTRO (default landing while today's daily is unfinished) ============ -->
+    <div class="screen menu daily-intro" id="screen-daily-intro">
+      <h1>Inductive</h1>
+      <div class="subtitle" id="intro-title">Daily Challenge</div>
+      <p class="intro-note" id="intro-sub">5 puzzles · 3 tries each · the same for everyone</p>
+      <p class="intro-note">Spot each hidden rule and build the answer right inside the puzzle.
+        A wrong try keeps your work so you can adjust.</p>
+      <button class="go-btn" id="btn-start-daily">
+        <span class="go-word">START</span>
+        <span class="sub-note">your time begins when you press</span>
+      </button>
+      <div class="menu-links">
+        <button class="menu-link" id="btn-intro-menu">Main menu</button>
+        <span aria-hidden="true">·</span>
+        <button class="menu-link" id="btn-intro-howto">How to play</button>
+      </div>
+    </div>
+
     <!-- ============ MAIN MENU ============ -->
     <div class="screen menu" id="screen-menu">
       <h1>Inductive</h1>
@@ -59,20 +77,15 @@
       </div>
     </div>
 
-    <!-- ============ ROUND ============ -->
+    <!-- ============ ROUND (puzzle-first: full-width progress, corner HUD) ============ -->
     <div class="screen" id="screen-round">
-      <div class="header">
-        <h1 class="round-title" id="round-title">Round in Progress</h1>
-        <div class="stats">
-          <div class="stat"><span>Points</span><b id="score">0</b></div>
-          <div class="stat"><span>Question</span><b id="problemNum">1/5</b></div>
-          <div class="stat"><span>Time</span><b id="timer">0.0s</b></div>
-          <button class="quit" id="btn-mute" aria-label="Toggle sound">🔊</button>
-          <button class="quit" id="btn-quit">Quit</button>
-        </div>
+      <div class="progress-bar round-progress"><div class="progress-fill" id="progress"></div></div>
+      <div class="corner-hud" aria-label="Round status">
+        <span class="hud-q" id="problemNum">1/5</span>
+        <span class="hud-time" id="timer">0.0s</span>
+        <button class="hud-btn" id="btn-mute" aria-label="Toggle sound">🔊</button>
+        <button class="hud-btn" id="btn-quit" aria-label="Quit round">✕</button>
       </div>
-
-      <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
 
       <div class="panel">
         <div class="label" id="sequence-label">Evaluate the sequence. Which figure comes NEXT?</div>

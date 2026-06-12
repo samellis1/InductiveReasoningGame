@@ -1,17 +1,22 @@
-/* The "construct your answer" UI. Instead of picking from A–E, the player builds
-   the answer panel: a live-preview canvas flanked by palettes (shapes on one
-   side, colors on the other), plus contextual controls per puzzle kind.
+/* Inline answer engine. The blank "?" slot inside the puzzle IS the answer:
+   players click dots straight into it, drag fills onto its sections, or watch
+   it fill as they type. A tray below the puzzle holds palettes/pads/submit.
 
-   renderBuilder(container, spec, onSubmit) renders the UI and calls
-   onSubmit(builtPanel) when the player commits. Grading lives in game.js, which
-   compares the built panel to the question's correct `next` panel via panelEq.
+   mountAnswer(slot, tray, spec, onSubmit):
+     slot — the "?" element inside the sequence/matrix/weeks layout
+     tray — the area under the puzzle (palettes, pads, submit button)
+   Grading lives in game.js (panelEq against the question's `next`).
 
    answerSpec kinds (produced by generators.js):
-     center        { shapes, fills, sizes? }                 single centered shape
-     centerNested  { shapes, fills }                         outer + inner shape
-     dots          { dotMode:'count'|'cells', dotToken, grid3,
-                     order?, maxCount?, cellPositions? }      dot patterns
-     nested        { colors, textures }                      the nested-squares puzzle
+     center        { shapes, fills }            single centered shape
+     centerNested  { shapes, fills }            outer + inner shape
+     dots          { cellPositions, dotToken, grid3 }  click cells in the slot
+     nested        { shape, n, states }         drag/tap fills onto sections
+     number        { maxLen }                   digit pad; slot shows the value
+     week          {}                           tap day cells in the answer row
+     pickday       {}                           tap the one valid day
+     month         { days, marks? }             tap days on a month calendar
+     bars          { labels, max, unit? }       drag bars up/down
 */
 
 import { renderPanel, textureSwatchSvg, nestedSectionPaths } from './panels.js';
@@ -20,33 +25,33 @@ const SHAPE_LABEL = {
   triangle: 'Triangle', square: 'Square', circle: 'Circle', pentagon: 'Pentagon',
   hexagon: 'Hexagon', diamond: 'Diamond', star: 'Star', cross: 'Cross',
 };
-const PREVIEW_SIZE = 150;
+const SLOT_SIZE = 150;
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-/* ---------- shared bits ---------- */
+/* ---------- chips ---------- */
 
-function shapeBtn(kind, selected) {
+function shapeBtn(kind) {
   const label = SHAPE_LABEL[kind] || kind;
-  return `<button type="button" class="bld-chip${selected ? ' sel' : ''}" data-shape="${kind}" title="${label}">
+  return `<button type="button" class="bld-chip" data-shape="${kind}" title="${label}">
     ${renderPanel({ center: { kind, fill: 'outline' } }, 44)}<span class="bld-chip-label">${label}</span></button>`;
 }
 
-function fillBtn(fill, selected) {
+function fillBtn(fill) {
   const swatch = fill === 'outline'
     ? textureSwatchSvg(null, null, 34)
     : fill === 'solid'
       ? `<svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" fill="#111"/></svg>`
       : textureSwatchSvg(null, fill, 34);
   const label = fill === 'outline' ? 'Outline' : fill === 'solid' ? 'Solid' : fill;
-  return `<button type="button" class="bld-chip${selected ? ' sel' : ''}" data-fill="${fill}" title="${label}">${swatch}<span class="bld-chip-label">${label}</span></button>`;
+  return `<button type="button" class="bld-chip" data-fill="${fill}" title="${label}">${swatch}<span class="bld-chip-label">${label}</span></button>`;
 }
 
-/* ---------- panel assembly from builder state ---------- */
+/* ---------- panel assembly ---------- */
 
 function toPanel(spec, st) {
   if (spec.kind === 'center' || spec.kind === 'centerNested') {
-    if (!st.outer.kind) return {}; // nothing built yet
+    if (!st.outer.kind) return {};
     const center = { kind: st.outer.kind, fill: st.outer.fill };
-    if (spec.sizes) center.scale = st.outer.scale;
     if (spec.kind === 'centerNested' && st.inner.kind) {
       center.inner = { kind: st.inner.kind, fill: st.inner.fill };
     }
@@ -54,15 +59,10 @@ function toPanel(spec, st) {
   }
   if (spec.kind === 'dots') {
     const cells = Array(9).fill(null);
-    if (spec.dotMode === 'count') {
-      for (let k = 0; k < st.count && k < spec.order.length; k++) cells[spec.order[k]] = { ...spec.dotToken };
-    } else {
-      for (const p of st.cells) cells[p] = { ...spec.dotToken };
-    }
+    for (const p of st.cells) cells[p] = { ...spec.dotToken };
     return spec.grid3 ? { grid3: true, cells } : { cells };
   }
   if (spec.kind === 'nested') {
-    // st.outer/st.inner hold cycle indices: -1 = blank, k = spec.states[k].
     const toSections = idxs => idxs.map(k => (k < 0 ? null : { ...spec.states[k] }));
     return { nested: { shape: spec.shape, outer: toSections(st.outer), inner: toSections(st.inner) } };
   }
@@ -73,6 +73,10 @@ function toPanel(spec, st) {
     if (st.day >= 0) days[st.day] = 'mark';
     return { week: { days } };
   }
+  if (spec.kind === 'month') {
+    return { month: { days: spec.days, marks: [...st.marked].sort((a, b) => a - b) } };
+  }
+  if (spec.kind === 'bars') return { bars: st.values.slice() };
   return {};
 }
 
@@ -80,191 +84,141 @@ function initialState(spec) {
   if (spec.kind === 'center' || spec.kind === 'centerNested') {
     return {
       slot: 'outer',
-      outer: { kind: null, fill: spec.fills[0], scale: spec.sizes ? spec.sizes[Math.floor(spec.sizes.length / 2)] : 1 },
+      outer: { kind: null, fill: spec.fills[0] },
       inner: { kind: null, fill: spec.fills[0] },
     };
   }
-  if (spec.kind === 'dots') {
-    return spec.dotMode === 'count' ? { count: 0 } : { cells: new Set() };
-  }
+  if (spec.kind === 'dots') return { cells: new Set() };
   if (spec.kind === 'nested') {
-    return {
-      outer: Array(spec.n).fill(-1),
-      inner: Array(spec.n).fill(-1),
-    };
+    return { outer: Array(spec.n).fill(-1), inner: spec.single ? [] : Array(spec.n).fill(-1) };
   }
   if (spec.kind === 'number') return { value: '' };
   if (spec.kind === 'week') return { days: Array(7).fill(false) };
   if (spec.kind === 'pickday') return { day: -1 };
+  if (spec.kind === 'month') return { marked: new Set() };
+  if (spec.kind === 'bars') return { values: spec.labels.map(() => 0) };
   return {};
 }
 
-/* ---------- per-kind shells + wiring ---------- */
+/* ---------- tray markup per kind ---------- */
 
-function centerShell(spec) {
-  const nested = spec.kind === 'centerNested';
-  const sortedSizes = spec.sizes ? spec.sizes.slice().sort((a, b) => a - b) : null;
-  const sizeRow = sortedSizes ? `
-    <div class="bld-controls">
-      <span class="bld-ctl-label">Size</span>
-      ${sortedSizes.map((s, i) => `<button type="button" class="bld-size" data-size="${s}" title="Size ${i + 1}"><span style="font-size:${9 + i * 4}px;line-height:1">●</span></button>`).join('')}
-    </div>` : '';
-  const slotRow = nested ? `
-    <div class="bld-controls">
-      <span class="bld-ctl-label">Editing</span>
-      <button type="button" class="bld-slot sel" data-slot="outer">Outer shape</button>
-      <button type="button" class="bld-slot" data-slot="inner">Inner shape</button>
-    </div>` : '';
-  return `
-    <div class="bld-stage">
-      <div class="bld-palette bld-shapes">
-        <div class="bld-palette-title">Shapes</div>
-        ${spec.shapes.map(k => shapeBtn(k, false)).join('')}
-      </div>
-      <div class="bld-canvas-wrap">
-        <div class="bld-canvas"></div>
-        ${slotRow}
-        ${sizeRow}
-      </div>
-      <div class="bld-palette bld-fills">
-        <div class="bld-palette-title">Fill</div>
-        ${spec.fills.map(f => fillBtn(f, false)).join('')}
-      </div>
-    </div>`;
-}
-
-function dotsShell(spec) {
-  // The canvas itself is the tap target: an invisible 3x3 grid is laid over the
-  // preview in wire(), so players add/remove dots by tapping inside the box.
-  if (spec.dotMode === 'count') {
+function trayFor(spec) {
+  if (spec.kind === 'center' || spec.kind === 'centerNested') {
+    const slotRow = spec.kind === 'centerNested' ? `
+      <div class="bld-controls">
+        <span class="bld-ctl-label">Editing</span>
+        <button type="button" class="bld-slot sel" data-slot="outer">Outer shape</button>
+        <button type="button" class="bld-slot" data-slot="inner">Inner shape</button>
+      </div>` : '';
     return `
-      <div class="bld-stage bld-stage-center">
-        <div class="bld-canvas-wrap">
-          <div class="bld-dotbox"><div class="bld-canvas"></div></div>
-          <div class="bld-controls">
-            <button type="button" class="bld-step" data-step="-1" aria-label="Remove a dot">−</button>
-            <span class="bld-count" aria-live="polite">0 dots</span>
-            <button type="button" class="bld-step" data-step="1" aria-label="Add a dot">+</button>
-          </div>
-          <div class="bld-hint">Tap inside the box to add or remove a dot.</div>
+      ${slotRow}
+      <div class="bld-tray-row">
+        <div class="bld-palette bld-shapes">
+          <div class="bld-palette-title">Shapes</div>
+          ${spec.shapes.map(shapeBtn).join('')}
+        </div>
+        <div class="bld-palette bld-fills">
+          <div class="bld-palette-title">Fill</div>
+          ${spec.fills.map(fillBtn).join('')}
         </div>
       </div>`;
   }
-  return `
-    <div class="bld-stage bld-stage-center">
-      <div class="bld-canvas-wrap">
-        <div class="bld-dotbox"><div class="bld-canvas"></div></div>
-        <div class="bld-hint">Tap inside the box to add or remove a dot.</div>
-      </div>
-    </div>`;
-}
-
-/* Drag-and-drop (with a tap fallback): the palette below holds one draggable
-   swatch per fill. Drag a swatch onto a section, or tap a swatch to pick it up
-   then tap a section to drop it. Tapping a section with no swatch picked clears
-   it. */
-function nestedShell(spec) {
-  const legend = spec.states.map((s, k) =>
-    `<button type="button" class="bld-legend-chip" data-state="${k}" draggable="true" aria-label="Fill ${k + 1}">${textureSwatchSvg(s.texture || null, s.color || null, 24)}</button>`).join('');
-  return `
-    <div class="bld-stage bld-stage-center">
-      <div class="bld-canvas-wrap">
-        <div class="bld-nested-wrap">
-          <div class="bld-canvas"></div>
-        </div>
-        <div class="bld-hint">Drag a fill into a section — or tap a fill, then a section. Tap a filled section to clear it.</div>
-        <div class="bld-legend" aria-label="Available fills — drag onto a section">${legend}</div>
+  if (spec.kind === 'dots') {
+    return `<div class="bld-hint">Tap inside the answer box to add or remove a dot.</div>`;
+  }
+  if (spec.kind === 'nested') {
+    const legend = spec.states.map((s, k) =>
+      `<button type="button" class="bld-legend-chip" data-state="${k}" draggable="true" aria-label="Fill ${k + 1}">${textureSwatchSvg(s.texture || null, s.color || null, 30)}</button>`).join('');
+    return `
+      <div class="bld-tray-head">
+        <span class="bld-hint">Drag a fill into a section of the answer — or tap a fill, then a section.</span>
         <button type="button" class="bld-clear" data-clear="1">Clear all</button>
       </div>
-    </div>`;
-}
-
-function numberShell() {
-  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
-  return `
-    <div class="bld-stage bld-stage-center">
-      <div class="bld-canvas-wrap">
-        <div class="bld-numpad-display" aria-live="polite">&nbsp;</div>
-        <div class="bld-numpad">
-          ${keys.map(k => `<button type="button" class="bld-key" data-key="${k}">${k}</button>`).join('')}
-        </div>
-      </div>
-    </div>`;
-}
-
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-function weekShell(single) {
-  return `
-    <div class="bld-stage bld-stage-center">
-      <div class="bld-canvas-wrap">
-        <div class="bld-canvas bld-canvas-wide"></div>
-        <div class="bld-weekrow">
-          ${DAY_LABELS.map((d, i) => `<button type="button" class="bld-day" data-day="${i}">${d}</button>`).join('')}
-        </div>
-        <div class="bld-hint">${single ? 'Pick the one day that fits every rule.' : 'Tap the days to mark them good.'}</div>
-      </div>
-    </div>`;
-}
-
-function shellFor(spec) {
-  if (spec.kind === 'dots') return dotsShell(spec);
-  if (spec.kind === 'nested') return nestedShell(spec);
-  if (spec.kind === 'number') return numberShell();
-  if (spec.kind === 'week') return weekShell(false);
-  if (spec.kind === 'pickday') return weekShell(true);
-  return centerShell(spec);
+      <div class="bld-legend" aria-label="Available fills — drag onto a section">${legend}</div>`;
+  }
+  if (spec.kind === 'number') {
+    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
+    return `
+      <div class="bld-numpad">
+        ${keys.map(k => `<button type="button" class="bld-key" data-key="${k}">${k}</button>`).join('')}
+      </div>`;
+  }
+  if (spec.kind === 'week' || spec.kind === 'pickday') {
+    return `<div class="bld-hint">${spec.kind === 'pickday'
+      ? 'Tap the one day in the answer row that fits every rule.'
+      : 'Tap the days in the answer row to mark them.'}</div>`;
+  }
+  if (spec.kind === 'month') {
+    return `
+      <div class="bld-tray-head">
+        <span class="bld-hint">Tap every day on the calendar that fits all the requirements.</span>
+        <button type="button" class="bld-clear" data-clear="1">Clear all</button>
+      </div>`;
+  }
+  if (spec.kind === 'bars') {
+    return `<div class="bld-hint">Drag each bar up or down to set its value.</div>`;
+  }
+  return '';
 }
 
 /* ---------- public entry ---------- */
 
-export function renderBuilder(container, spec, onSubmit) {
+export function mountAnswer(slot, tray, spec, onSubmit) {
   const st = initialState(spec);
-  container.innerHTML = `
+  slot.classList.add('answer-slot');
+  slot.innerHTML = '';
+
+  tray.innerHTML = `
     <div class="builder" data-kind="${spec.kind}">
-      ${shellFor(spec)}
+      ${trayFor(spec)}
       <button type="button" class="bld-submit next">Submit answer</button>
     </div>`;
+  const root = tray.querySelector('.builder');
 
-  const root = container.querySelector('.builder');
-  const canvas = root.querySelector('.bld-canvas');
+  /* The slot's live canvas. Interactive overlays mount on top of it. */
+  const canvas = document.createElement('div');
+  canvas.className = 'slot-canvas';
+  slot.appendChild(canvas);
+
+  function repaint() {
+    if (spec.kind === 'number') {
+      canvas.innerHTML = `<div class="slot-number">${st.value || '<span class="slot-ph">?</span>'}</div>`;
+      return;
+    }
+    if (spec.kind === 'week' || spec.kind === 'pickday') {
+      canvas.innerHTML = weekAnswerHtml(spec, st);
+      wireWeekCells();
+      return;
+    }
+    if (spec.kind === 'month') {
+      canvas.innerHTML = monthAnswerHtml(spec, st);
+      wireMonthCells();
+      return;
+    }
+    if (spec.kind === 'bars') {
+      canvas.innerHTML = barsHtml(spec, st);
+      return; // bar drag handlers attach once, on the wrapper (delegated)
+    }
+    const panel = toPanel(spec, st);
+    const empty = spec.kind !== 'nested' && !panel.center && !(panel.cells || []).some(c => c);
+    canvas.innerHTML = empty && spec.kind !== 'dots'
+      ? `<span class="slot-ph">?</span>`
+      : renderPanel(panel, SLOT_SIZE);
+  }
 
   function setSel(selector, attr, value) {
     root.querySelectorAll(selector).forEach(b => b.classList.toggle('sel', b.dataset[attr] === String(value)));
   }
 
-  function repaint() {
-    if (spec.kind === 'number') {
-      root.querySelector('.bld-numpad-display').textContent = st.value || ' ';
-      return;
-    }
-    const size = spec.kind === 'week' || spec.kind === 'pickday' ? 330 : PREVIEW_SIZE;
-    canvas.innerHTML = renderPanel(toPanel(spec, st), size);
-    if (spec.kind === 'dots' && spec.dotMode === 'count') {
-      root.querySelector('.bld-count').textContent = `${st.count} ${st.count === 1 ? 'dot' : 'dots'}`;
-    }
-  }
+  /* ----- per-kind wiring ----- */
 
-  wire(root, spec, st, repaint, setSel);
-
-  // Reflect initial state in the palette highlights.
-  if (spec.kind === 'center' || spec.kind === 'centerNested') {
-    setSel('[data-fill]', 'fill', st.outer.fill);
-    if (spec.sizes) setSel('[data-size]', 'size', st.outer.scale);
-  }
-
-  root.querySelector('.bld-submit').addEventListener('click', () => onSubmit(toPanel(spec, st)));
-  repaint();
-}
-
-function wire(root, spec, st, repaint, setSel) {
   if (spec.kind === 'center' || spec.kind === 'centerNested') {
     const target = () => (spec.kind === 'centerNested' ? st[st.slot] : st.outer);
     root.querySelectorAll('[data-slot]').forEach(b => b.addEventListener('click', () => {
       st.slot = b.dataset.slot;
       setSel('[data-slot]', 'slot', st.slot);
-      // reflect the active slot's current fill selection
       setSel('[data-fill]', 'fill', target().fill);
+      setSel('[data-shape]', 'shape', target().kind);
     }));
     root.querySelectorAll('[data-shape]').forEach(b => b.addEventListener('click', () => {
       target().kind = b.dataset.shape;
@@ -276,95 +230,38 @@ function wire(root, spec, st, repaint, setSel) {
       setSel('[data-fill]', 'fill', b.dataset.fill);
       repaint();
     }));
-    root.querySelectorAll('[data-size]').forEach(b => b.addEventListener('click', () => {
-      target().scale = parseFloat(b.dataset.size);
-      setSel('[data-size]', 'size', b.dataset.size);
-      repaint();
-    }));
-    return;
+    setSel('[data-fill]', 'fill', st.outer.fill);
   }
 
   if (spec.kind === 'dots') {
-    // An invisible 3x3 grid laid over the preview turns "tap inside the box"
-    // into add/remove. Cells outside the puzzle's usable positions are inert.
-    const box = root.querySelector('.bld-dotbox');
+    // Invisible 3x3 hit-grid over the slot: tap a cell to toggle its dot.
     const overlay = document.createElement('div');
-    overlay.className = 'bld-dotgrid-overlay';
-    const usable = p => (spec.dotMode === 'cells' ? spec.cellPositions.includes(p) : spec.order.includes(p));
+    overlay.className = 'slot-dotgrid';
+    const usable = p => spec.cellPositions.includes(p);
     overlay.innerHTML = [0, 1, 2, 3, 4, 5, 6, 7, 8]
       .map(p => `<button type="button" class="bld-cellhit${usable(p) ? '' : ' disabled'}" data-cell="${p}" ${usable(p) ? '' : 'disabled'} aria-label="Cell ${p + 1}"></button>`)
       .join('');
-    box.appendChild(overlay);
-
+    slot.appendChild(overlay);
     overlay.querySelectorAll('[data-cell]:not([disabled])').forEach(b => b.addEventListener('click', () => {
       const p = parseInt(b.dataset.cell, 10);
-      if (spec.dotMode === 'count') {
-        // Dots fill in a fixed order; tapping sets how far the fill reaches.
-        // Tap an empty cell → fill through it; tap a filled cell → stop before it.
-        const idx = spec.order.indexOf(p);
-        st.count = idx < st.count ? idx : Math.min(spec.maxCount, idx + 1);
-      } else if (st.cells.has(p)) {
-        st.cells.delete(p);
-      } else {
-        st.cells.add(p);
-      }
+      if (st.cells.has(p)) st.cells.delete(p); else st.cells.add(p);
       repaint();
     }));
-
-    if (spec.dotMode === 'count') {
-      root.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
-        const next = st.count + parseInt(b.dataset.step, 10);
-        st.count = Math.max(0, Math.min(spec.maxCount, next));
-        repaint();
-      }));
-    }
-    return;
-  }
-
-  if (spec.kind === 'number') {
-    root.querySelectorAll('.bld-key').forEach(b => b.addEventListener('click', () => {
-      const k = b.dataset.key;
-      if (k === 'C') st.value = '';
-      else if (k === '⌫') st.value = st.value.slice(0, -1);
-      else if (st.value.length < (spec.maxLen || 8)) st.value += k;
-      repaint();
-    }));
-    return;
-  }
-
-  if (spec.kind === 'week') {
-    root.querySelectorAll('.bld-day').forEach(b => b.addEventListener('click', () => {
-      const i = parseInt(b.dataset.day, 10);
-      st.days[i] = !st.days[i];
-      b.classList.toggle('sel', st.days[i]);
-      repaint();
-    }));
-    return;
-  }
-
-  if (spec.kind === 'pickday') {
-    root.querySelectorAll('.bld-day').forEach(b => b.addEventListener('click', () => {
-      st.day = parseInt(b.dataset.day, 10);
-      root.querySelectorAll('.bld-day').forEach(x => x.classList.toggle('sel', x === b));
-      repaint();
-    }));
-    return;
   }
 
   if (spec.kind === 'nested') {
-    // Transparent SVG overlay with the exact section geometry as tap targets.
-    const wrap = root.querySelector('.bld-nested-wrap');
     const overlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    overlay.setAttribute('viewBox', `0 0 ${PREVIEW_SIZE} ${PREVIEW_SIZE}`);
+    overlay.setAttribute('viewBox', `0 0 ${SLOT_SIZE} ${SLOT_SIZE}`);
     overlay.setAttribute('class', 'bld-nested-overlay');
-    overlay.innerHTML = nestedSectionPaths(spec.shape, PREVIEW_SIZE)
+    overlay.innerHTML = nestedSectionPaths(spec.shape, SLOT_SIZE)
+      .filter(sec => !spec.single || sec.group !== 'inner')
       .map(sec => `<path d="${sec.d}" data-group="${sec.group}" data-i="${sec.i}" class="bld-sect"
         role="button" tabindex="0" aria-label="${sec.group} section ${sec.i + 1}"/>`)
       .join('');
-    wrap.appendChild(overlay);
+    slot.appendChild(overlay);
 
-    // The "brush": a fill picked up from the palette, applied on tap or drop.
-    // -1 means no brush, so a section tap clears it instead.
+    // The "brush": a fill picked up from the tray, applied on tap or drop.
+    // -1 = no brush, so tapping a section clears it.
     let brush = -1;
     const swatches = root.querySelectorAll('.bld-legend-chip[data-state]');
     const reflectBrush = () => swatches.forEach(s => s.classList.toggle('sel', parseInt(s.dataset.state, 10) === brush));
@@ -399,4 +296,119 @@ function wire(root, spec, st, repaint, setSel) {
       repaint();
     });
   }
+
+  if (spec.kind === 'number') {
+    const press = k => {
+      if (k === 'C') st.value = '';
+      else if (k === '⌫') st.value = st.value.slice(0, -1);
+      else if (st.value.length < (spec.maxLen || 8)) st.value += k;
+      repaint();
+    };
+    root.querySelectorAll('.bld-key').forEach(b => b.addEventListener('click', () => press(b.dataset.key)));
+    st.keyHandler = e => {
+      if (/^[0-9]$/.test(e.key)) press(e.key);
+      else if (e.key === 'Backspace') press('⌫');
+    };
+    document.addEventListener('keydown', st.keyHandler);
+    // mountAnswer is called fresh per question; the old listener dies with a
+    // re-mount because we tag it on the slot for cleanup.
+    if (slot._numKeyHandler) document.removeEventListener('keydown', slot._numKeyHandler);
+    slot._numKeyHandler = st.keyHandler;
+  }
+
+  function wireWeekCells() {
+    canvas.querySelectorAll('[data-day]').forEach(b => b.addEventListener('click', () => {
+      const i = parseInt(b.dataset.day, 10);
+      if (spec.kind === 'pickday') st.day = st.day === i ? -1 : i;
+      else st.days[i] = !st.days[i];
+      repaint();
+    }));
+  }
+
+  function wireMonthCells() {
+    canvas.querySelectorAll('[data-mday]').forEach(b => b.addEventListener('click', () => {
+      const d = parseInt(b.dataset.mday, 10);
+      if (st.marked.has(d)) st.marked.delete(d); else st.marked.add(d);
+      repaint();
+    }));
+  }
+
+  if (spec.kind === 'month') {
+    root.querySelector('[data-clear]').addEventListener('click', () => {
+      st.marked.clear();
+      repaint();
+    });
+  }
+
+  if (spec.kind === 'bars') {
+    // Pointer-drag on each bar column; values snap to integers in [0, max].
+    let drag = null; // { idx, rect }
+    canvas.addEventListener('pointerdown', e => {
+      const col = e.target.closest('[data-bar]');
+      if (!col) return;
+      const idx = parseInt(col.dataset.bar, 10);
+      const rect = canvas.querySelector(`.bar-track[data-track="${idx}"]`).getBoundingClientRect();
+      drag = { idx, rect };
+      canvas.setPointerCapture(e.pointerId);
+      setFromY(e.clientY);
+      e.preventDefault();
+    });
+    canvas.addEventListener('pointermove', e => { if (drag) setFromY(e.clientY); });
+    const end = () => { drag = null; };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+    function setFromY(y) {
+      const { idx, rect } = drag;
+      const frac = 1 - Math.max(0, Math.min(1, (y - rect.top) / rect.height));
+      st.values[idx] = Math.round(frac * spec.max);
+      // Re-render and refresh the cached track rect (layout may shift).
+      canvas.innerHTML = barsHtml(spec, st);
+      const track = canvas.querySelector(`.bar-track[data-track="${idx}"]`);
+      if (track) drag.rect = track.getBoundingClientRect();
+    }
+  }
+
+  root.querySelector('.bld-submit').addEventListener('click', () => onSubmit(toPanel(spec, st)));
+  repaint();
+}
+
+/* Back-compat name used by game.js prior to the inline rework. */
+export { mountAnswer as renderBuilder };
+
+/* ---------- inline-slot markup helpers ---------- */
+
+function weekAnswerHtml(spec, st) {
+  const on = i => (spec.kind === 'pickday' ? st.day === i : st.days[i]);
+  return `<div class="slot-week">${DAY_LABELS.map((d, i) =>
+    `<button type="button" class="slot-day${on(i) ? ' sel' : ''}" data-day="${i}">
+      <span class="slot-day-name">${d}</span><span class="slot-day-dot">${on(i) ? '●' : ''}</span>
+    </button>`).join('')}</div>`;
+}
+
+function monthAnswerHtml(spec, st) {
+  const marks = spec.marks || {};
+  const head = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<span class="m-head">${d}</span>`).join('');
+  const cells = [];
+  for (let d = 1; d <= spec.days; d++) {
+    const sym = marks[d] === 'star' ? '★' : marks[d] === 'diamond' ? '◆' : '';
+    cells.push(`<button type="button" class="m-day${st.marked.has(d) ? ' sel' : ''}" data-mday="${d}">
+      <span class="m-num">${d}</span>${sym ? `<span class="m-sym">${sym}</span>` : ''}
+    </button>`);
+  }
+  return `<div class="slot-month">${head}${cells.join('')}</div>`;
+}
+
+function barsHtml(spec, st) {
+  return `<div class="slot-bars">${spec.labels.map((label, i) => {
+    const v = st.values[i];
+    const pct = Math.round((v / spec.max) * 100);
+    return `
+      <div class="bar-col" data-bar="${i}">
+        <div class="bar-val">${v}${spec.unit || ''}</div>
+        <div class="bar-track" data-track="${i}">
+          <div class="bar-fill" style="height:${pct}%"></div>
+        </div>
+        <div class="bar-label">${label}</div>
+      </div>`;
+  }).join('')}</div>`;
 }

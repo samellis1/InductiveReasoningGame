@@ -339,10 +339,68 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
 .bld-legend-chip.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
 .bld-legend-chip svg { border-radius: 3px; }
 
+/* ----- Puzzle-first round format -----
+   The puzzle IS the page: no boxed panel, a full-bleed progress bar pinned to
+   the top, and a small fixed HUD bottom-right (question · time · mute · quit). */
+#screen-round .panel {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 10px 0 90px 0; /* bottom space so the HUD never overlaps content */
+}
+.round-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  height: 7px;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+.corner-hud {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  color: var(--muted);
+}
+.corner-hud .hud-q { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.corner-hud .hud-time { font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+.hud-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+  min-height: 0;
+}
+.hud-btn:hover { color: var(--text); }
+
+/* Bigger puzzle tiles in the round (sizes match the renderPanel calls). */
+#screen-round .sequence .tile { width: 150px; height: 150px; }
+#screen-round .matrix .tile { width: 120px; height: 120px; }
+@media (max-width: 560px) {
+  #screen-round .sequence .tile { width: 124px; height: 124px; }
+  #screen-round .matrix .tile { width: 100px; height: 100px; }
+  #screen-round .sequence .tile svg, #screen-round .matrix .tile svg { max-width: 100%; max-height: 100%; }
+}
+
 /* ----- Per-family identity -----
    Each puzzle family gets its own accent + frame treatment so types look,
    play, and feel distinct. data-family is set on .panel by loadQuestion. */
-.panel[data-family] { border-top: 4px solid var(--fam-accent, var(--accent)); }
+.panel[data-family] { border-top: none; }
 .panel[data-family]::before {
   content: attr(data-family);
   display: inline-block;
@@ -362,6 +420,9 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
 .panel[data-family="number"]   { --fam-accent: #E69F00; }
 .panel[data-family="weeks"]    { --fam-accent: #D55E00; }
 .panel[data-family="schedule"] { --fam-accent: #8b5cf6; }
+.panel[data-family="month"]    { --fam-accent: #D55E00; }
+.panel[data-family="bars"]     { --fam-accent: #0072B2; }
+.panel[data-family="word"]     { --fam-accent: #E69F00; }
 
 /* Nested puzzles read better with larger frames and no arrows between them. */
 .panel[data-family="nested"] .sequence .arrow { display: none; }
@@ -397,6 +458,10 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
   padding: 8px 12px;
   margin-bottom: 14px;
 }
+
+/* ----- Daily intro ----- */
+.daily-intro .intro-note { color: var(--muted); font-size: 14px; max-width: 420px; margin: 8px auto 0; line-height: 1.5; }
+.daily-intro .go-btn { margin-top: 24px; }
 
 /* ----- GO button + menu links ----- */
 .go-btn {
@@ -472,6 +537,91 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
   .streak-glow { transition: none; }
   .tile.correct { animation: none; }
 }
+
+/* ----- Inline answer slot (the "?" in the puzzle is the input) ----- */
+.answer-slot { position: relative; border-style: dashed; border-color: var(--accent); }
+.answer-slot .slot-canvas { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.answer-slot .slot-canvas svg { max-width: 100%; max-height: 100%; }
+.answer-slot .slot-ph { font-size: 40px; font-weight: 300; color: var(--accent); }
+.answer-slot.resolved { pointer-events: none; border-style: solid; }
+.answer-slot.resolved.correct { border-color: var(--correct); box-shadow: 0 0 0 3px var(--correct); }
+.answer-slot.resolved.wrong { border-color: #d55e00; box-shadow: 0 0 0 3px #d55e00; }
+
+/* dots: invisible 3x3 hit-grid over the slot */
+.slot-dotgrid {
+  position: absolute; inset: 0;
+  display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+}
+
+/* number: typed value lives in the slot */
+.slot-number { font-size: 40px; font-weight: 600; color: #111; font-variant-numeric: tabular-nums; }
+
+/* week answer row in the slot */
+.week-slot { flex: 1; }
+.slot-week { display: flex; gap: 4px; }
+.slot-day {
+  flex: 1; min-width: 38px; min-height: 52px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel-light); color: var(--text); font-size: 11px; cursor: pointer;
+}
+.slot-day.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
+.slot-day-dot { font-size: 12px; min-height: 14px; }
+.question-week .week-slot .slot-week { width: 100%; }
+
+/* month calendar answer */
+.month-layout, .bars-layout { display: flex; justify-content: center; margin-bottom: 20px; }
+.month-slot { width: 100%; max-width: 420px; }
+.slot-month {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  background: #fff; border: 1px solid #ccc; border-radius: 10px; padding: 10px;
+}
+.m-head { text-align: center; font-size: 11px; color: #888; padding: 2px 0; }
+.m-day {
+  position: relative; min-height: 44px;
+  border: 1px solid #ddd; border-radius: 6px; background: #fafafa;
+  color: #111; font-size: 13px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+}
+.m-day:hover { border-color: var(--accent); }
+.m-day.sel { background: var(--accent); border-color: var(--accent); color: #fff; }
+.m-day .m-sym { font-size: 11px; line-height: 1; }
+.m-day.sel .m-sym { color: #fff; }
+
+/* interactive ratio bars */
+.bars-slot { width: 100%; max-width: 420px; }
+.slot-bars {
+  display: flex; gap: 28px; justify-content: center; align-items: flex-end;
+  background: #fff; border: 1px solid #ccc; border-radius: 10px; padding: 18px 24px 12px;
+}
+.bar-col { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: ns-resize; touch-action: none; }
+.bar-val { font-size: 15px; font-weight: 600; color: #111; font-variant-numeric: tabular-nums; }
+.bar-track {
+  width: 56px; height: 180px;
+  background: #f0f1f3; border: 1px solid #ddd; border-radius: 8px;
+  display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;
+}
+.bar-fill { background: var(--accent); width: 100%; transition: height 0.05s linear; }
+.bar-label { font-size: 12px; color: #555; max-width: 90px; text-align: center; }
+
+/* word problems: big readable prompt next to the answer slot */
+.word-layout { display: flex; gap: 24px; align-items: center; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+.word-prompt {
+  max-width: 420px;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--fam-accent, var(--accent));
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+/* tray head: hint left, clear right (owner: clear sits above, to the right) */
+.bld-tray-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; max-width: 480px; margin: 0 auto 10px; }
+.bld-tray-row { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.builder { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 
 /* Answer reveal after submitting */
 .reveal { display: flex; gap: 24px; justify-content: center; align-items: flex-end; flex-wrap: wrap; }
@@ -835,6 +985,7 @@ button.quit:hover { color: var(--text); border-color: var(--accent); }
 }
 .leaderboard .history-row { grid-template-columns: 44px 1fr 110px 90px 120px; }
 .leaderboard .history-row.no-diff { grid-template-columns: 44px 1fr 90px 120px; }
+.leaderboard .history-row.lb-attempts { grid-template-columns: 44px 1fr 80px 90px 100px; }
 .leaderboard .history-row .rank { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 500; }
 .leaderboard .history-row.me { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .leaderboard .history-row .you {

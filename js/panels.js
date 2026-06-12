@@ -86,6 +86,8 @@ export function canonicalPanel(p) {
     out.text = Number.isFinite(n) ? String(n) : String(p.text);
   }
   if (p.week) out.week = p.week.days.map(d => d || null);
+  if (p.month) out.month = { days: p.month.days, marks: [...(p.month.marks || [])].sort((a, b) => a - b) };
+  if (p.bars) out.bars = p.bars.slice();
   if (p.shaded && p.shaded.length) out.shaded = [...p.shaded].sort((a, b) => a - b);
   if (p.quadrants && p.quadrants.some(q => q)) out.quadrants = p.quadrants.map(canonicalToken);
   if (p.center) out.center = canonicalToken(p.center);
@@ -382,9 +384,47 @@ export function renderPanel(panel, size = 120) {
       else if (d === 'diamond') content += `<polygon points="${cx},${(cy - r * 1.2).toFixed(2)} ${(cx + r * 1.2).toFixed(2)},${cy} ${cx},${(cy + r * 1.2).toFixed(2)} ${(cx - r * 1.2).toFixed(2)},${cy}" fill="${COLORS.blue}" stroke="#111" stroke-width="1"/>`;
     }
   }
+  if (panel.month) {
+    // Month calendar (reveal rendering): 7 columns, day numbers, marked days
+    // filled green. Day 1 is a Monday.
+    const cols = 7;
+    const rows = Math.ceil(panel.month.days / cols);
+    const cw = s / cols;
+    const ch = cw * 0.9;
+    const markSet = new Set(panel.month.marks || []);
+    for (let d = 1; d <= panel.month.days; d++) {
+      const r = Math.floor((d - 1) / cols), c = (d - 1) % cols;
+      const x = c * cw, y = r * ch;
+      const marked = markSet.has(d);
+      content += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${cw.toFixed(2)}" height="${ch.toFixed(2)}"
+        fill="${marked ? COLORS.green : 'white'}" stroke="#bbb" stroke-width="1"/>`
+        + `<text x="${(x + cw / 2).toFixed(2)}" y="${(y + ch / 2).toFixed(2)}" text-anchor="middle" dominant-baseline="central"
+        font-size="${(cw * 0.34).toFixed(1)}" fill="${marked ? '#fff' : '#555'}" font-family="inherit">${d}</text>`;
+    }
+    return `<svg width="${s}" height="${(rows * ch).toFixed(2)}" viewBox="0 0 ${s} ${(rows * ch).toFixed(2)}" role="img" aria-hidden="true">${content}</svg>`;
+  }
+  if (panel.bars) {
+    // Bar pair/triple (reveal rendering): heights proportional, values on top.
+    const n = panel.bars.length;
+    const maxV = Math.max(...panel.bars, 1);
+    const bw = Math.min(56, (s - 40) / n - 16);
+    const h = s * 0.66;
+    const baseY = h + 24;
+    panel.bars.forEach((v, i) => {
+      const x = (s / (n + 1)) * (i + 1) - bw / 2;
+      const bh = (v / maxV) * h;
+      content += `<rect x="${x.toFixed(2)}" y="${(baseY - bh).toFixed(2)}" width="${bw}" height="${bh.toFixed(2)}" fill="${COLORS.green}" stroke="#111" stroke-width="1"/>`
+        + `<text x="${(x + bw / 2).toFixed(2)}" y="${(baseY - bh - 8).toFixed(2)}" text-anchor="middle" font-size="14" font-weight="600" fill="#111" font-family="inherit">${v}</text>`
+        + `<text x="${(x + bw / 2).toFixed(2)}" y="${baseY + 14}" text-anchor="middle" font-size="12" fill="#555" font-family="inherit">${String.fromCharCode(65 + i)}</text>`;
+    });
+    const totalH = baseY + 20;
+    return `<svg width="${s}" height="${totalH}" viewBox="0 0 ${s} ${totalH}" role="img" aria-hidden="true">${content}</svg>`;
+  }
   if (panel.nested) {
     const shape = panel.nested.shape || 'square';
-    const sections = nestedSectionPaths(shape, s);
+    // Single-layer panels (empty inner) draw no inner sections at all.
+    const hasInner = (panel.nested.inner || []).length > 0;
+    const sections = nestedSectionPaths(shape, s).filter(sec => hasInner || sec.group !== 'inner');
     let innerOutline = '';
     for (const sec of sections) {
       const state = (panel.nested[sec.group] || [])[sec.i];

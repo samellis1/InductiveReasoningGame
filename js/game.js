@@ -12,7 +12,7 @@ import {
 } from './daily.js';
 import {
   loadHistory, saveHistoryEntry, getDailyResult, saveDailyResult,
-  computeStreaks, getFlag, setFlag, loadDaily, getPendingJoin,
+  computeStreaks, loadDaily, getPendingJoin,
 } from './storage.js';
 import { esc, registerScreens, showScreen, activeScreen, openModal, closeModal } from './ui.js';
 import {
@@ -38,9 +38,7 @@ const ui = {
   next: document.getElementById('next'),
   timer: document.getElementById('timer'),
   problemNum: document.getElementById('problemNum'),
-  score: document.getElementById('score'),
   progress: document.getElementById('progress'),
-  roundTitle: document.getElementById('round-title'),
 };
 
 /* ---------- Daily progress (mid-round persistence: no restart-scumming) ---------- */
@@ -129,11 +127,7 @@ function loadQuestion() {
   const q = currentQuestion();
   const n = totalLength();
 
-  ui.roundTitle.textContent = game.mode === 'daily'
-    ? `Daily Challenge #${dailyNumber()}`
-    : `Practice — ${practiceDifficulty[0].toUpperCase()}${practiceDifficulty.slice(1)}`;
   ui.problemNum.textContent = `${game.idx + 1}/${n}`;
-  ui.score.textContent = totalPoints(game.results);
   ui.progress.style.width = (game.idx / n * 100) + '%';
   ui.msg.textContent = '';
   ui.msg.className = 'msg';
@@ -145,41 +139,60 @@ function loadQuestion() {
   ui.panel.dataset.family = fam; // drives per-family styling
   let answerLabel = 'Build the figure that comes next';
 
+  // The blank slot inside the puzzle IS the answer input (mounted below).
+  const SLOT_TILE = `<div class="tile question" id="answer-slot"></div>`;
+  const SLOT_WEEK = `<div class="week-row question-week"><span class="week-num">Wk 5</span><div id="answer-slot" class="week-slot"></div></div>`;
+
   if (fam === 'matrix') {
-    label.textContent = 'Complete the grid. Which figure belongs in the empty cell?';
+    label.textContent = 'Complete the grid. Build the figure for the empty cell.';
     ui.sequence.className = 'matrix';
     ui.sequence.innerHTML = q.frames
-      .map(p => `<div class="tile">${renderPanel(p, 96)}</div>`)
-      .join('') + `<div class="tile question">?</div>`;
+      .map(p => `<div class="tile">${renderPanel(p, 120)}</div>`)
+      .join('') + SLOT_TILE;
     answerLabel = 'Build the figure for the empty cell';
   } else if (fam === 'weeks') {
     label.textContent = 'Watch the weeks unfold.';
     ui.sequence.className = 'weeks';
     ui.sequence.innerHTML = q.frames
       .map((p, i) => `<div class="week-row"><span class="week-num">Wk ${i + 1}</span>${renderPanel(p, 330)}</div>`)
-      .join('')
-      + `<div class="week-row question-week"><span class="week-num">Wk 5</span><span class="week-q">?</span></div>`;
+      .join('') + SLOT_WEEK;
     answerLabel = 'Mark the good days in week five';
   } else if (fam === 'schedule') {
     label.textContent = 'One week. Three rules. One right day.';
     ui.sequence.className = 'schedule';
-    ui.sequence.innerHTML = `<div class="week-row">${renderPanel(q.frames[0], 330)}</div>`;
+    ui.sequence.innerHTML = `<div class="week-row">${renderPanel(q.frames[0], 330)}</div>`
+      + `<div class="week-row question-week"><span class="week-num">You</span><div id="answer-slot" class="week-slot"></div></div>`;
     answerLabel = 'Pick the day';
+  } else if (fam === 'month') {
+    label.textContent = 'Read the requirements. Mark every day that fits.';
+    ui.sequence.className = 'month-layout';
+    ui.sequence.innerHTML = `<div id="answer-slot" class="month-slot"></div>`;
+    answerLabel = 'Tap the qualifying days';
+  } else if (fam === 'bars') {
+    label.textContent = 'Read the prompt. Set the bars so the numbers work.';
+    ui.sequence.className = 'bars-layout';
+    ui.sequence.innerHTML = `<div id="answer-slot" class="bars-slot"></div>`;
+    answerLabel = 'Drag the bars';
+  } else if (fam === 'word') {
+    label.textContent = 'Work the numbers.';
+    ui.sequence.className = 'word-layout';
+    ui.sequence.innerHTML = `<div class="word-prompt">${esc(q.prompt || '')}</div>` + SLOT_TILE;
+    answerLabel = 'Type your answer';
   } else if (fam === 'number') {
     label.textContent = 'Evaluate the sequence. What number comes next?';
     ui.sequence.className = 'sequence';
     ui.sequence.innerHTML = q.frames
-      .map(p => `<div class="tile">${renderPanel(p, 120)}</div>`)
+      .map(p => `<div class="tile">${renderPanel(p, 150)}</div>`)
       .join('<div class="arrow" aria-hidden="true">→</div>')
-      + `<div class="arrow" aria-hidden="true">→</div><div class="tile question">?</div>`;
+      + `<div class="arrow" aria-hidden="true">→</div>` + SLOT_TILE;
     answerLabel = 'Type the next number';
   } else {
     label.textContent = 'Evaluate the sequence. Which figure comes NEXT?';
     ui.sequence.className = 'sequence';
     ui.sequence.innerHTML = q.frames
-      .map(p => `<div class="tile">${renderPanel(p, 120)}</div>`)
+      .map(p => `<div class="tile">${renderPanel(p, 150)}</div>`)
       .join('<div class="arrow" aria-hidden="true">→</div>')
-      + `<div class="arrow" aria-hidden="true">→</div><div class="tile question">?</div>`;
+      + `<div class="arrow" aria-hidden="true">→</div>` + SLOT_TILE;
     if (fam === 'nested') answerLabel = 'Fill in the next figure — drag a fill into each section';
   }
 
@@ -188,7 +201,8 @@ function loadQuestion() {
   instr.textContent = q.instruction || '';
 
   ui.answerLabel.textContent = answerLabel;
-  renderBuilder(ui.builder, q.answerSpec, built => handleSubmit(built));
+  renderBuilder(document.getElementById('answer-slot'), ui.builder, q.answerSpec,
+    built => handleSubmit(built));
 
   startTimer();
 }
@@ -223,13 +237,14 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-/* Up to MAX_TRIES per puzzle. Points: solved on try t → MAX_TRIES+1-t (3/2/1),
-   unsolved → 0. A wrong submit (with tries left) keeps the builder editable and
-   the timer running — a mistake costs points, not the puzzle. */
+/* Up to MAX_TRIES per puzzle. You compete on solved count, then total
+   attempts, then total time. A wrong submit (with tries left) keeps the
+   builder editable and the timer running — a mistake costs an attempt, not
+   the puzzle. */
 export const MAX_TRIES = 3;
 
-const pointsFor = r => (r.solved ? MAX_TRIES + 1 - r.tries : 0);
-const totalPoints = results => results.reduce((s, r) => s + pointsFor(r), 0);
+const totalAttempts = results => results.reduce((s, r) => s + r.tries, 0);
+const totalSolved = results => results.filter(r => r.solved).length;
 
 function handleSubmit(built) {
   if (!game || game.answered) return;
@@ -261,34 +276,30 @@ function handleSubmit(built) {
   const elapsed = stopTimer();
   const r = { solved: correct, tries: game.tries, timeMs: Math.round(elapsed) };
   game.results.push(r);
-  const pts = pointsFor(r);
 
-  // Reveal what they built; when unsolved, show the correct answer beside it.
-  // Week panels are wide; everything else fits the square tile.
-  const revealTile = (p, cls) => (p.week
-    ? `<div class="tile week-tile ${cls}">${renderPanel(p, 300)}</div>`
-    : `<div class="tile ${cls}">${renderPanel(p, 120)}</div>`);
-  ui.builder.innerHTML = `
+  // Reveal in place: the slot (already showing what they built) goes green or
+  // red and freezes; when unsolved, the correct answer renders in the tray.
+  const slot = document.getElementById('answer-slot');
+  if (slot) {
+    slot.classList.add('resolved', correct ? 'correct' : 'wrong');
+  }
+  const correctTile = (p) => (p.week || p.month || p.bars
+    ? `<div class="tile week-tile correct">${renderPanel(p, 300)}</div>`
+    : `<div class="tile correct">${renderPanel(p, 120)}</div>`);
+  ui.builder.innerHTML = correct ? '' : `
     <div class="reveal">
       <div class="reveal-item">
-        <div class="reveal-label">Your answer</div>
-        ${revealTile(built, correct ? 'correct' : 'wrong')}
-      </div>
-      ${correct ? '' : `
-      <div class="reveal-item">
         <div class="reveal-label">Correct answer</div>
-        ${revealTile(q.next, 'correct')}
-      </div>`}
+        ${correctTile(q.next)}
+      </div>
     </div>`;
 
   ui.msg.textContent = correct
-    ? `Correct on try ${r.tries} — ${pts} point${pts === 1 ? '' : 's'}! ${(elapsed / 1000).toFixed(1)}s`
+    ? `Correct${r.tries > 1 ? ` on try ${r.tries}` : ' first try'}! ${(elapsed / 1000).toFixed(1)}s`
     : `Out of tries — the correct answer is shown.`;
   ui.msg.className = 'msg ' + (correct ? 'correct' : 'wrong');
   ui.rule.innerHTML = `<b>The rule:</b> ${esc(q.rule)}`;
   ui.rule.hidden = false;
-
-  ui.score.textContent = totalPoints(game.results);
   ui.progress.style.width = ((game.idx + 1) / totalLength() * 100) + '%';
 
   if (game.mode === 'daily') saveDailyProgress(game.results);
@@ -308,8 +319,8 @@ function nextOrFinish() {
 function finishRound() {
   const results = game.results;
   const totalMs = results.reduce((s, r) => s + r.timeMs, 0);
-  const solved = results.filter(r => r.solved).length;
-  const points = totalPoints(results);
+  const solved = totalSolved(results);
+  const attempts = totalAttempts(results);
   playSound('round');
   setStreakHeat(0);
 
@@ -317,8 +328,7 @@ function finishRound() {
     const entry = {
       score: solved,
       total: DAILY_LENGTH,
-      points,
-      maxPoints: DAILY_LENGTH * MAX_TRIES,
+      attempts,
       timeMs: totalMs,
       grid: results.map(r => (r.solved ? 'g' : 'r')),
       triesGrid: results.map(r => (r.solved ? r.tries : 'x')),
@@ -329,7 +339,7 @@ function finishRound() {
     saveDailyResult(todayKey(), entry);
     clearDailyProgress();
     postScore({ difficulty: 'daily', avgMs: totalMs / DAILY_LENGTH, accuracy: solved / DAILY_LENGTH,
-      points, dayKey: todayKey(),
+      attempts, dayKey: todayKey(),
       local: { kind: 'daily', key: todayKey() } });
     game = null;
     renderMenu();
@@ -345,8 +355,7 @@ function finishRound() {
       totalTime: totalMs / 1000,
       correct: solved,
       total: results.length,
-      points,
-      maxPoints: results.length * MAX_TRIES,
+      attempts,
       problems: results.map(r => ({ time: r.timeMs / 1000, correct: r.solved, tries: r.tries })),
     };
     saveHistoryEntry(entry);
@@ -387,21 +396,26 @@ function countUp(el, target, suffix) {
   requestAnimationFrame(tick);
 }
 
+/* Attempts for legacy entries that predate the field: solved = 1 try, missed = 3. */
+function attemptsOf(entry) {
+  if (entry.attempts != null) return entry.attempts;
+  return triesGridOf(entry).reduce((s, t) => s + (t === 'x' ? MAX_TRIES : t), 0);
+}
+
 function showDailyResults(entry) {
   const streaks = computeStreaks(todayKey());
-  const maxPts = entry.maxPoints || entry.total * MAX_TRIES;
-  const pts = entry.points ?? entry.score; // legacy entries: show solved count
-  const perfect = pts === maxPts;
+  const attempts = attemptsOf(entry);
+  const perfect = entry.score === entry.total && attempts === entry.total;
   const secs = Math.round(entry.timeMs / 1000);
   const container = document.getElementById('results-body');
   container.innerHTML = `
     <h2>${perfect ? 'Perfect!' : entry.score >= 3 ? 'Nice work!' : 'Round Complete'}</h2>
-    <div class="big" id="results-big">${pts}/${maxPts}</div>
-    <div class="big-label">Points — Daily Challenge #${entry.number}</div>
+    <div class="big" id="results-big">${entry.score}/${entry.total}</div>
+    <div class="big-label">Solved — Daily Challenge #${entry.number}</div>
     <div class="share-grid" aria-label="result grid: try each puzzle was solved on">${triesHtml(triesGridOf(entry))}</div>
 
     <div class="results-grid">
-      <div class="result-stat"><div class="val">${entry.score}/${entry.total}</div><div class="lbl">Solved</div></div>
+      <div class="result-stat"><div class="val">${attempts}</div><div class="lbl">Attempts</div></div>
       <div class="result-stat"><div class="val">${secs}s</div><div class="lbl">Total Time</div></div>
       <div class="result-stat"><div class="val">🔥 ${streaks.current}</div><div class="lbl">Day Streak</div></div>
     </div>
@@ -420,7 +434,7 @@ function showDailyResults(entry) {
       <button class="back-link" id="btn-results-menu2">Main Menu</button>
     </div>`;
   showScreen('results');
-  countUp(document.getElementById('results-big'), pts, `/${maxPts}`);
+  countUp(document.getElementById('results-big'), entry.score, `/${entry.total}`);
 
   document.getElementById('btn-share').addEventListener('click', () => shareDaily(entry, streaks.current));
   document.getElementById('btn-results-stats').addEventListener('click', openStats);
@@ -435,8 +449,8 @@ async function shareDaily(entry, streak) {
   const text = shareText({
     number: entry.number,
     triesGrid: triesGridOf(entry),
-    points: entry.points ?? entry.score,
-    maxPoints: entry.maxPoints || entry.total * MAX_TRIES,
+    solved: entry.score,
+    total: entry.total,
     timeMs: entry.timeMs,
     streak,
     url: window.location.origin + window.location.pathname,
@@ -471,7 +485,8 @@ function stopCountdown() {
 
 function renderPracticeResults(entry) {
   const container = document.getElementById('results-body');
-  const maxPts = entry.maxPoints || entry.total * MAX_TRIES;
+  const attempts = entry.attempts
+    ?? entry.problems.reduce((s, p) => s + (p.tries || (p.correct ? 1 : MAX_TRIES)), 0);
   const rows = entry.problems.map((p, i) => `
     <tr>
       <td>${i + 1}</td>
@@ -480,11 +495,11 @@ function renderPracticeResults(entry) {
     </tr>`).join('');
   container.innerHTML = `
     <h2>Round Complete</h2>
-    <div class="big" id="results-big">${entry.points ?? entry.correct}/${maxPts}</div>
-    <div class="big-label">Points</div>
+    <div class="big" id="results-big">${entry.correct}/${entry.total}</div>
+    <div class="big-label">Solved</div>
 
     <div class="results-grid">
-      <div class="result-stat"><div class="val">${entry.correct}/${entry.total}</div><div class="lbl">Solved</div></div>
+      <div class="result-stat"><div class="val">${attempts}</div><div class="lbl">Attempts</div></div>
       <div class="result-stat"><div class="val">${entry.avg.toFixed(2)}s</div><div class="lbl">Avg / Puzzle</div></div>
       <div class="result-stat"><div class="val">${esc(entry.difficulty[0].toUpperCase() + entry.difficulty.slice(1))}</div><div class="lbl">Difficulty</div></div>
     </div>
@@ -501,7 +516,7 @@ function renderPracticeResults(entry) {
       <button class="back-link" id="btn-results-history">View History</button>
       <button class="back-link" id="btn-results-menu2">Main Menu</button>
     </div>`;
-  countUp(document.getElementById('results-big'), entry.points ?? entry.correct, `/${maxPts}`);
+  countUp(document.getElementById('results-big'), entry.correct, `/${entry.total}`);
   document.getElementById('btn-again').addEventListener('click', startPractice);
   document.getElementById('btn-results-history').addEventListener('click', openHistory);
   document.getElementById('btn-results-menu2').addEventListener('click', () => { renderMenu(); showScreen('menu'); });
@@ -613,8 +628,8 @@ function howToPlay(fromBoot) {
       <div class="tile question" style="width:56px;height:56px;font-size:22px;">?</div>
     </div>
     <p class="howto-note">Here the fill alternates — so you'd build a <b>solid circle</b> with the controls under the puzzle.</p>
-    <p class="howto-note"><b>You get 3 tries per puzzle.</b> Solve it on the first try for 3 points,
-      second for 2, third for 1 — up to 15 points a day. A wrong try keeps your work so you can adjust.</p>
+    <p class="howto-note"><b>You get 3 tries per puzzle.</b> You compete on puzzles solved,
+      then fewest total attempts, then time. A wrong try keeps your work so you can adjust.</p>
     <div class="howto-example">
       <div class="tile">${renderPanel(nestedMini, 56)}</div>
       <span class="howto-gallery-note">Some puzzles, like this one, you fill in by tapping sections.
@@ -658,20 +673,30 @@ function renderMenu() {
 
 /* ---------- Wiring ---------- */
 
-registerScreens(['invite', 'menu', 'round', 'results', 'history', 'leaderboard', 'stats']);
+registerScreens(['invite', 'daily-intro', 'menu', 'round', 'results', 'history', 'leaderboard', 'stats']);
 
-/* GO: first-time visitors get the "what is this" explainer before the daily;
-   returning players go straight in (or resume). */
-function goDaily() {
-  primeAudio();
-  if (!getFlag('onboarded') && !Object.keys(loadDaily().results).length) {
-    setFlag('onboarded');
-    howToPlay(true);
-    return;
-  }
-  startDaily();
+/* Daily intro: the pre-round screen with the START button. The timer (and the
+   round itself) only begins when START is pressed. */
+function showDailyIntro() {
+  const n = dailyNumber();
+  const progress = loadDailyProgress();
+  document.getElementById('intro-title').textContent = `Daily Challenge #${n}`;
+  document.getElementById('intro-sub').textContent = progress
+    ? `Resume — question ${progress.results.length + 1} of ${DAILY_LENGTH}`
+    : '5 puzzles · 3 tries each · the same for everyone';
+  showScreen('daily-intro');
 }
 
+/* GO: finished today → results; otherwise the intro (START begins the clock). */
+function goDaily() {
+  primeAudio();
+  if (getDailyResult(todayKey())) { startDaily(); return; } // shows results
+  showDailyIntro();
+}
+
+document.getElementById('btn-start-daily').addEventListener('click', () => { primeAudio(); startDaily(); });
+document.getElementById('btn-intro-menu').addEventListener('click', () => { renderMenu(); showScreen('menu'); });
+document.getElementById('btn-intro-howto').addEventListener('click', () => howToPlay(false));
 document.getElementById('btn-daily').addEventListener('click', goDaily);
 document.getElementById('btn-practice').addEventListener('click', startPractice);
 document.getElementById('btn-stats').addEventListener('click', openStats);
@@ -734,5 +759,8 @@ initAuth({
   } else if (user) {
     resolvePendingInvite();
   }
-  showScreen('menu');
+  // Daily unfinished → land straight on the daily intro so players hop right
+  // in; finished → the normal menu.
+  if (!getDailyResult(todayKey())) showDailyIntro();
+  else showScreen('menu');
 });

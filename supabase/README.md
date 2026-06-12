@@ -10,9 +10,10 @@ browser (`postScore` in [js/social.js](../js/social.js)) with the anon key.
 Without it, anyone with the anon key can insert a fake 1ms score under any
 `user_id`. The migration adds:
 
-> **Latest migration:** run `daily-points-migration.sql` — adds `points`
-> (0–15, the 3-try scoring) and `day_key` (YYYY-MM-DD daily identity used by
-> the leaderboard), plus the speed-floor and difficulty-set updates.
+> **Latest migration:** run `attempts-migration.sql` — adds `attempts` (5–15,
+> total tries across the daily's 5 puzzles) and `day_key` (YYYY-MM-DD daily
+> identity used by the leaderboard), plus the speed-floor and difficulty-set
+> updates. Boards rank by solved desc → attempts asc → time asc.
 
 - **CHECK constraints** — `avg_solve_ms` must be 500–600000 ms, `accuracy`
   0–1, `difficulty` one of `easy/medium/hard/daily`, `display_name`

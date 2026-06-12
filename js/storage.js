@@ -99,7 +99,7 @@ export function getUnpostedScores(todayKey) {
       difficulty: 'daily',
       avgMs: daily.timeMs / daily.total,
       accuracy: daily.score / daily.total,
-      points: daily.points ?? null,
+      attempts: daily.attempts ?? null,
       dayKey: todayKey,
     });
   }
