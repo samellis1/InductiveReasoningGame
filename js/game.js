@@ -139,8 +139,21 @@ function loadQuestion() {
   ui.panel.dataset.family = fam; // drives per-family styling
   let answerLabel = 'Build the figure that comes next';
 
-  // The blank slot inside the puzzle IS the answer input (mounted below).
-  const SLOT_TILE = `<div class="tile question" id="answer-slot"></div>`;
+  // Sequence frames stack top-to-bottom (numbered 1→4) so the order is never
+  // ambiguous, and the answer (frame 5) continues the column as a larger stage.
+  // Everything is sized in viewport units to fit on one screen where it can,
+  // and scrolls vertically when it can't.
+  const frameStack = (frames, size) => `
+    <div class="frame-stack">
+      ${frames.map((p, i) => `<div class="tile frame-tile">${renderPanel(p, size)}<span class="frame-chip">${i + 1}</span></div>`).join('')}
+    </div>`;
+  const ANSWER_STAGE = `
+    <div class="answer-stage">
+      <div class="answer-wrap">
+        <div class="tile question answer-big" id="answer-slot"></div>
+        <span class="frame-chip chip-answer">5</span>
+      </div>
+    </div>`;
   const SLOT_WEEK = `<div class="week-row question-week"><span class="week-num">Wk 5</span><div id="answer-slot" class="week-slot"></div></div>`;
 
   if (fam === 'matrix') {
@@ -148,7 +161,7 @@ function loadQuestion() {
     ui.sequence.className = 'matrix';
     ui.sequence.innerHTML = q.frames
       .map(p => `<div class="tile">${renderPanel(p, 120)}</div>`)
-      .join('') + SLOT_TILE;
+      .join('') + `<div class="tile question" id="answer-slot"></div>`;
     answerLabel = 'Build the figure for the empty cell';
   } else if (fam === 'weeks') {
     label.textContent = 'Watch the weeks unfold.';
@@ -176,24 +189,18 @@ function loadQuestion() {
   } else if (fam === 'word') {
     label.textContent = 'Work the numbers.';
     ui.sequence.className = 'word-layout';
-    ui.sequence.innerHTML = `<div class="word-prompt">${esc(q.prompt || '')}</div>` + SLOT_TILE;
+    ui.sequence.innerHTML = `<div class="word-prompt">${esc(q.prompt || '')}</div>` + ANSWER_STAGE;
     answerLabel = 'Type your answer';
   } else if (fam === 'number') {
     label.textContent = 'Evaluate the sequence. What number comes next?';
     ui.sequence.className = 'sequence';
-    ui.sequence.innerHTML = q.frames
-      .map(p => `<div class="tile">${renderPanel(p, 150)}</div>`)
-      .join('<div class="arrow" aria-hidden="true">→</div>')
-      + `<div class="arrow" aria-hidden="true">→</div>` + SLOT_TILE;
+    ui.sequence.innerHTML = frameStack(q.frames, 132) + ANSWER_STAGE;
     answerLabel = 'Type the next number';
   } else {
     label.textContent = 'Evaluate the sequence. Which figure comes NEXT?';
     ui.sequence.className = 'sequence';
-    ui.sequence.innerHTML = q.frames
-      .map(p => `<div class="tile">${renderPanel(p, 150)}</div>`)
-      .join('<div class="arrow" aria-hidden="true">→</div>')
-      + `<div class="arrow" aria-hidden="true">→</div>` + SLOT_TILE;
-    if (fam === 'nested') answerLabel = 'Fill in the next figure — drag a fill into each section';
+    ui.sequence.innerHTML = frameStack(q.frames, 132) + ANSWER_STAGE;
+    if (fam === 'nested') answerLabel = 'Fill in figure 5 — drag a fill into each section';
   }
 
   const instr = document.getElementById('instruction');

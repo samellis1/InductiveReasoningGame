@@ -128,7 +128,7 @@ function trayFor(spec) {
   }
   if (spec.kind === 'nested') {
     const legend = spec.states.map((s, k) =>
-      `<button type="button" class="bld-legend-chip" data-state="${k}" draggable="true" aria-label="Fill ${k + 1}">${textureSwatchSvg(s.texture || null, s.color || null, 30)}</button>`).join('');
+      `<button type="button" class="bld-legend-chip" data-state="${k}" aria-label="Fill ${k + 1}">${textureSwatchSvg(s.texture || null, s.color || null, 38)}</button>`).join('');
     return `
       <div class="bld-tray-head">
         <span class="bld-hint">Drag a fill into a section of the answer — or tap a fill, then a section.</span>
@@ -164,6 +164,14 @@ function trayFor(spec) {
 /* ---------- public entry ---------- */
 
 export function mountAnswer(slot, tray, spec, onSubmit) {
+  // Kill any document-level listener from the previous question. (The old
+  // cleanup tagged the handler on the slot element, but the slot is rebuilt
+  // every question — handlers piled up across rounds.)
+  if (mountAnswer._docKeyHandler) {
+    document.removeEventListener('keydown', mountAnswer._docKeyHandler);
+    mountAnswer._docKeyHandler = null;
+  }
+
   const st = initialState(spec);
   slot.classList.add('answer-slot');
   slot.innerHTML = '';
@@ -260,33 +268,69 @@ export function mountAnswer(slot, tray, spec, onSubmit) {
       .join('');
     slot.appendChild(overlay);
 
-    // The "brush": a fill picked up from the tray, applied on tap or drop.
+    // The "brush": a fill picked up from the tray, applied on tap or drag.
     // -1 = no brush, so tapping a section clears it.
+    //
+    // Dragging uses POINTER events (HTML5 drag-and-drop never fires on
+    // iOS/Android): pointerdown on a chip arms it; moving past a small
+    // threshold spawns a ghost swatch that follows the finger/cursor; release
+    // hit-tests the section under the pointer. A press-and-release without
+    // movement is a tap, which toggles the brush.
     let brush = -1;
     const swatches = root.querySelectorAll('.bld-legend-chip[data-state]');
     const reflectBrush = () => swatches.forEach(s => s.classList.toggle('sel', parseInt(s.dataset.state, 10) === brush));
+    const apply = (group, i, val) => { st[group][i] = val; repaint(); };
+
     swatches.forEach(s => {
       const k = parseInt(s.dataset.state, 10);
-      s.addEventListener('click', () => { brush = brush === k ? -1 : k; reflectBrush(); });
-      s.addEventListener('dragstart', e => {
-        e.dataTransfer.setData('text/plain', String(k));
-        e.dataTransfer.effectAllowed = 'copy';
+      s.setAttribute('draggable', 'false'); // suppress native DnD on desktop
+      s.addEventListener('pointerdown', e => {
+        const startX = e.clientX, startY = e.clientY;
+        let ghost = null;
+        let hovered = null;
+        const move = ev => {
+          if (!ghost && Math.hypot(ev.clientX - startX, ev.clientY - startY) > 6) {
+            ghost = s.cloneNode(true);
+            ghost.classList.add('bld-drag-ghost');
+            document.body.appendChild(ghost);
+          }
+          if (ghost) {
+            ghost.style.left = ev.clientX + 'px';
+            ghost.style.top = ev.clientY + 'px';
+            const el = document.elementFromPoint(ev.clientX, ev.clientY);
+            const sect = el && el.closest ? el.closest('.bld-sect') : null;
+            if (hovered && hovered !== sect) hovered.classList.remove('drop');
+            hovered = sect;
+            if (hovered) hovered.classList.add('drop');
+            ev.preventDefault();
+          }
+        };
+        const up = ev => {
+          document.removeEventListener('pointermove', move);
+          document.removeEventListener('pointerup', up);
+          document.removeEventListener('pointercancel', up);
+          if (hovered) hovered.classList.remove('drop');
+          if (ghost) {
+            ghost.remove();
+            const el = document.elementFromPoint(ev.clientX, ev.clientY);
+            const sect = el && el.closest ? el.closest('.bld-sect') : null;
+            if (sect) apply(sect.dataset.group, parseInt(sect.dataset.i, 10), k);
+          } else {
+            brush = brush === k ? -1 : k; // plain tap: pick up / put down the brush
+            reflectBrush();
+          }
+        };
+        document.addEventListener('pointermove', move);
+        document.addEventListener('pointerup', up);
+        document.addEventListener('pointercancel', up);
+        e.preventDefault();
       });
     });
 
-    const apply = (group, i, val) => { st[group][i] = val; repaint(); };
     overlay.querySelectorAll('.bld-sect').forEach(p => {
       const group = p.dataset.group, i = parseInt(p.dataset.i, 10);
       p.addEventListener('click', () => apply(group, i, brush));
       p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apply(group, i, brush); } });
-      p.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; p.classList.add('drop'); });
-      p.addEventListener('dragleave', () => p.classList.remove('drop'));
-      p.addEventListener('drop', e => {
-        e.preventDefault();
-        p.classList.remove('drop');
-        const k = parseInt(e.dataTransfer.getData('text/plain'), 10);
-        if (!Number.isNaN(k)) apply(group, i, k);
-      });
     });
     root.querySelector('[data-clear]').addEventListener('click', () => {
       st.outer.fill(-1);
@@ -305,15 +349,17 @@ export function mountAnswer(slot, tray, spec, onSubmit) {
       repaint();
     };
     root.querySelectorAll('.bld-key').forEach(b => b.addEventListener('click', () => press(b.dataset.key)));
-    st.keyHandler = e => {
+    // Physical keyboard: digits type, Backspace deletes, Enter submits.
+    // Registered module-level so the next mountAnswer call cleans it up.
+    mountAnswer._docKeyHandler = e => {
       if (/^[0-9]$/.test(e.key)) press(e.key);
       else if (e.key === 'Backspace') press('⌫');
+      else if (e.key === 'Enter' && st.value) {
+        const btn = root.querySelector('.bld-submit');
+        if (btn && document.contains(btn)) { e.preventDefault(); btn.click(); }
+      }
     };
-    document.addEventListener('keydown', st.keyHandler);
-    // mountAnswer is called fresh per question; the old listener dies with a
-    // re-mount because we tag it on the slot for cleanup.
-    if (slot._numKeyHandler) document.removeEventListener('keydown', slot._numKeyHandler);
-    slot._numKeyHandler = st.keyHandler;
+    document.addEventListener('keydown', mountAnswer._docKeyHandler);
   }
 
   function wireWeekCells() {
@@ -360,15 +406,27 @@ export function mountAnswer(slot, tray, spec, onSubmit) {
     function setFromY(y) {
       const { idx, rect } = drag;
       const frac = 1 - Math.max(0, Math.min(1, (y - rect.top) / rect.height));
-      st.values[idx] = Math.round(frac * spec.max);
-      // Re-render and refresh the cached track rect (layout may shift).
-      canvas.innerHTML = barsHtml(spec, st);
-      const track = canvas.querySelector(`.bar-track[data-track="${idx}"]`);
-      if (track) drag.rect = track.getBoundingClientRect();
+      const v = Math.round(frac * spec.max);
+      if (v === st.values[idx]) return;
+      st.values[idx] = v;
+      // Mutate in place — a full re-render per pointermove destroys the node
+      // being dragged and stutters on phones.
+      const col = canvas.querySelector(`[data-bar="${idx}"]`);
+      if (col) {
+        col.querySelector('.bar-fill').style.height = Math.round((v / spec.max) * 100) + '%';
+        col.querySelector('.bar-val').textContent = `${v}${spec.unit || ''}`;
+      }
     }
   }
 
-  root.querySelector('.bld-submit').addEventListener('click', () => onSubmit(toPanel(spec, st)));
+  // Brief lockout so an accidental double-tap can't burn two tries.
+  const submitBtn = root.querySelector('.bld-submit');
+  submitBtn.addEventListener('click', () => {
+    if (submitBtn.disabled) return;
+    submitBtn.disabled = true;
+    setTimeout(() => { submitBtn.disabled = false; }, 400);
+    onSubmit(toPanel(spec, st));
+  });
   repaint();
 }
 

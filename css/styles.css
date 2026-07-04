@@ -163,13 +163,56 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
   letter-spacing: 1px;
   margin-bottom: 12px;
 }
-.sequence {
+.sequence { margin-bottom: 20px; }
+
+/* Frames stack TOP-TO-BOTTOM (numbered 1→4) so the order is unambiguous, then
+   the answer (frame 5) continues below. Reference frames are sized in viewport
+   units so the whole column tries to fit one screen; if it can't, the page
+   just scrolls vertically. Applies to every 4-frame sequence family. */
+.frame-stack {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
   align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 28px;
+  gap: clamp(8px, 1.6vh, 14px);
 }
+/* Reference frames: read-only, so kept compact and viewport-scaled. Beats the
+   generic #screen-round .sequence .tile width rule. */
+#screen-round .sequence .tile.frame-tile,
+.tile.frame-tile {
+  position: relative;
+  width: min(30vw, 15vh, 132px);
+  height: min(30vw, 15vh, 132px);
+}
+.frame-tile svg { width: 100%; height: 100%; }
+.frame-chip {
+  position: absolute;
+  top: -9px;
+  left: -9px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--muted);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+/* The answer stage: frame 5, larger and centered at the bottom of the column. */
+.answer-stage { display: flex; justify-content: center; margin: clamp(8px, 1.6vh, 14px) 0 8px; }
+.answer-wrap { position: relative; }
+.answer-wrap .chip-answer { background: var(--accent); }
+/* High specificity on purpose: must beat the #screen-round .sequence .tile
+   sizing rules at any screen width. Uses vh too so it shrinks to help fit. */
+#screen-round .sequence .tile.answer-big,
+.tile.answer-big {
+  width: min(70vw, 40vh, 240px);
+  height: min(70vw, 40vh, 240px);
+}
+.answer-big .slot-canvas svg { width: 100%; height: 100%; }
 .matrix {
   display: grid;
   grid-template-columns: repeat(3, max-content);
@@ -331,13 +374,28 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
 .bld-sect:focus-visible { stroke: var(--accent); stroke-width: 2; outline: none; }
 .bld-legend { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; align-items: center; }
 .bld-legend-chip {
-  display: inline-flex; padding: 3px; border: 2px solid transparent; border-radius: 6px;
+  display: inline-flex; padding: 4px; border: 2px solid transparent; border-radius: 8px;
   background: #fff; cursor: grab; line-height: 0;
+  min-width: 46px; min-height: 46px;             /* touch-friendly */
+  align-items: center; justify-content: center;
+  touch-action: none;                            /* pointer-drag, not scroll */
+  user-select: none;
+  -webkit-user-select: none;
 }
 .bld-legend-chip:active { cursor: grabbing; }
 .bld-legend-chip:hover { border-color: var(--muted); }
 .bld-legend-chip.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
-.bld-legend-chip svg { border-radius: 3px; }
+.bld-legend-chip svg { border-radius: 3px; pointer-events: none; }
+
+/* Pointer-drag ghost: a copy of the fill chip riding under the finger. */
+.bld-drag-ghost {
+  position: fixed;
+  transform: translate(-50%, -55%) scale(1.15);
+  pointer-events: none;
+  z-index: 200;
+  opacity: 0.92;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
 
 /* ----- Puzzle-first round format -----
    The puzzle IS the page: no boxed panel, a full-bleed progress bar pinned to
@@ -547,11 +605,19 @@ h1.round-title { font-size: 22px; margin: 0; font-weight: 500; }
 .answer-slot.resolved.correct { border-color: var(--correct); box-shadow: 0 0 0 3px var(--correct); }
 .answer-slot.resolved.wrong { border-color: #d55e00; box-shadow: 0 0 0 3px #d55e00; }
 
-/* dots: invisible 3x3 hit-grid over the slot */
+/* dots: 3x3 hit-grid over the slot. While unresolved, tappable cells carry a
+   faint inset outline so players can see where to tap (hover never fires on
+   touch); :active gives press feedback. */
 .slot-dotgrid {
   position: absolute; inset: 0;
   display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+  padding: 3px; gap: 2px;
 }
+.answer-slot:not(.resolved) .bld-cellhit:not(.disabled) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--muted) 35%, transparent);
+  border-radius: 6px;
+}
+.bld-cellhit:active:not(.disabled) { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 
 /* number: typed value lives in the slot */
 .slot-number { font-size: 40px; font-weight: 600; color: #111; font-variant-numeric: tabular-nums; }
